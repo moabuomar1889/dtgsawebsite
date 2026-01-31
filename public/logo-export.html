@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>DURRAT Logo Export</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 100px;
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .logo {
+            text-align: left;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .logo-main {
+            display: flex;
+            align-items: baseline;
+            font-size: 72px;
+            font-weight: 800;
+            color: #D4A537;
+            letter-spacing: 0.05em;
+            line-height: 1;
+            margin: 0;
+        }
+
+        .logo-text {
+            /* DURRAT text only */
+        }
+
+        .logo-dot {
+            /* SEPARATE DOT - control size, color, animation here */
+            font-size: 72px;
+            /* Change dot size */
+            color: #D4A537;
+            /* Change dot color */
+            margin-left: 2px;
+            animation: pulse 2s ease-in-out infinite;
+            /* Animation */
+        }
+
+        .logo-sub {
+            font-size: 18px;
+            font-weight: 600;
+            color: #D4A537;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            margin-top: 4px;
+            opacity: 0.9;
+        }
+
+        /* Dot Animation */
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(1.2);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="logo">
+        <div class="logo-main">
+            <span class="logo-text">DURRAT</span>
+            <span class="logo-dot">.</span>
+        </div>
+        <div class="logo-sub">CONSTRUCTION</div>
+    </div>
+</body>
+
+</html>

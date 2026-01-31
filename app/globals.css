@@ -1,26 +1,919 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Theme CSS Variables */
+@theme {
+  /* Colors */
+  --color-accent: #ef4444;
+  --color-bg: #161616;
+  --color-text: #d7d7d7;
+  --color-text-muted: #888888;
+  --color-border: #2a2a2a;
+  --color-card-bg: #1a1a1a;
+
+  /* Typography */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Spacing */
+  --spacing-section: 8rem;
+  --spacing-section-mobile: 4rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* Base styles */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #161616;
+    color: #d7d7d7;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: #161616;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: #2a2a2a;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-accent);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: #d7d7d7;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  h1 {
+    font-size: 3.5rem;
+  }
+
+  h2 {
+    font-size: 2.5rem;
+  }
+
+  h3 {
+    font-size: 1.75rem;
+  }
+
+  h4 {
+    font-size: 1.25rem;
+  }
+
+  @media (max-width: 768px) {
+    h1 {
+      font-size: 2.5rem;
+    }
+
+    h2 {
+      font-size: 2rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
+    }
+  }
+
+  p {
+    color: #888888;
+    line-height: 1.8;
+  }
+
+  a {
+    color: var(--color-accent);
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+
+  a:hover {
+    opacity: 0.8;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Utility classes */
+@layer utilities {
+  .accent-dot::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--color-accent);
+    border-radius: 50%;
+    margin-right: 12px;
+    vertical-align: middle;
+  }
+}
+
+/* Section styling */
+@layer components {
+  section {
+    position: relative;
+    overflow: hidden;
+  }
+}
+
+/* ============================================
+   GILBER CARD EFFECTS
+   - Border: 3px, theme accent color
+   - Speed: 0.18s linear
+   - Delays: 0 / 0.12s / 0.24s / 0.36s
+   ============================================ */
+
+/* VLT Card Base */
+.vlt-card {
+  position: relative;
+  z-index: 1;
+}
+
+/* Scroll reveal animation */
+.vlt-card {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.vlt-card--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ============================================
+   SVG STROKE BORDER ANIMATION
+   Starts TOP-RIGHT, goes counter-clockwise
+   ============================================ */
+
+.vlt-stroke-card {
+  position: relative;
+}
+
+/* SVG overlay - HIGH z-index to appear above images */
+.vlt-stroke-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 50;
+  overflow: visible;
+}
+
+/* Single-path border with stroke animation */
+.vlt-stroke-border rect {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  /* TRUE 1.5px regardless of viewBox */
+
+  /* Draw animation */
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  transition: stroke-dashoffset 0.55s linear;
+
+  /* Start at TOP-RIGHT, counter-clockwise */
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: rotate(90deg) scaleX(-1);
+}
+
+/* Hover: reveal path */
+.vlt-stroke-card:hover .vlt-stroke-border rect {
+  stroke-dashoffset: 0;
+}
+
+/* Mobile: Active state */
+.vlt-stroke-card:active .vlt-stroke-border rect {
+  stroke-dashoffset: 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .vlt-stroke-border rect {
+    stroke-dashoffset: 0;
+    transition: none;
+  }
+}
+
+/* Border container - HIGH z-index to appear above images */
+.vlt-post-border {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* vlt-card base - needs relative position and full height */
+.vlt-card {
+  position: relative;
+  height: 100%;
+}
+
+/* vlt-card-content takes full height for centering */
+.vlt-card-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  width: 100%;
+}
+
+/* Gray border modifier - for Clients page */
+.vlt-card.border-gray .vlt-post-border span {
+  background-color: rgba(128, 128, 128, 0.4);
+}
+
+.vlt-card.border-gray:hover .vlt-post-border span {
+  background-color: rgba(128, 128, 128, 0.7);
+}
+
+/* All border spans - theme accent color */
+.vlt-card .vlt-post-border span {
+  position: absolute;
+  z-index: 2;
+  background-color: var(--color-accent);
+}
+
+/* TOP line - 1px thick, draws LEFT to RIGHT */
+.vlt-card .vlt-post-border span.top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transition: transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+/* RIGHT line - 1px thick, draws TOP to BOTTOM */
+.vlt-card .vlt-post-border span.right {
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  transition: transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scaleY(0);
+  transform-origin: center top;
+}
+
+/* BOTTOM line - 1px thick, draws RIGHT to LEFT */
+.vlt-card .vlt-post-border span.bottom {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transition: transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scaleX(0);
+  transform-origin: right center;
+}
+
+/* LEFT line - 1px thick, draws BOTTOM to TOP */
+.vlt-card .vlt-post-border span.left {
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  transition: transform 0.36s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scaleY(0);
+  transform-origin: center bottom;
+}
+
+/* HOVER: Clockwise from TOP: TOP → RIGHT → BOTTOM → LEFT */
+.vlt-card:hover .vlt-post-border span.top {
+  transform: scaleX(1);
+  transition-delay: 0ms;
+}
+
+.vlt-card:hover .vlt-post-border span.right {
+  transform: scaleY(1);
+  transition-delay: 180ms;
+}
+
+.vlt-card:hover .vlt-post-border span.bottom {
+  transform: scaleX(1);
+  transition-delay: 360ms;
+}
+
+.vlt-card:hover .vlt-post-border span.left {
+  transform: scaleY(1);
+  transition-delay: 540ms;
+}
+
+/* HOVER OUT: Reverse animation (LEFT → BOTTOM → RIGHT → TOP) */
+.vlt-card:not(:hover) .vlt-post-border span.top {
+  transition-delay: 540ms;
+}
+
+.vlt-card:not(:hover) .vlt-post-border span.right {
+  transition-delay: 360ms;
+}
+
+.vlt-card:not(:hover) .vlt-post-border span.bottom {
+  transition-delay: 180ms;
+}
+
+.vlt-card:not(:hover) .vlt-post-border span.left {
+  transition-delay: 0ms;
+}
+
+/* Mobile: Active states (clockwise) */
+.vlt-card:active .vlt-post-border span.top {
+  transform: scaleX(1);
+  transition-delay: 0ms;
+}
+
+.vlt-card:active .vlt-post-border span.right {
+  transform: scaleY(1);
+  transition-delay: 120ms;
+}
+
+.vlt-card:active .vlt-post-border span.bottom {
+  transform: scaleX(1);
+  transition-delay: 240ms;
+}
+
+.vlt-card:active .vlt-post-border span.left {
+  transform: scaleY(1);
+  transition-delay: 360ms;
+}
+
+/* Reduced motion: instant border, no animation */
+@media (prefers-reduced-motion: reduce) {
+  .vlt-card .vlt-post-border span {
+    transition: none;
+  }
+
+  .vlt-card:hover .vlt-post-border span,
+  .vlt-card:active .vlt-post-border span {
+    transition-delay: 0ms;
+  }
+}
+
+/* ----------------------------------------
+   CONTENT FADE EMPHASIS
+   ---------------------------------------- */
+.vlt-card-content {
+  position: relative;
+  z-index: 5;
+  opacity: 0.65;
+  transition: opacity 0.3s ease;
+}
+
+.vlt-card:hover .vlt-card-content,
+.vlt-card:active .vlt-card-content {
+  opacity: 1;
+}
+
+/* ----------------------------------------
+   READ MORE ARROW MICRO-ANIMATION
+   ---------------------------------------- */
+.vlt-read-more-arrow {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.vlt-card:hover .vlt-read-more-arrow,
+.vlt-card:active .vlt-read-more-arrow {
+  transform: translateX(6px);
+}
+
+/* ----------------------------------------
+   FOCUS VISIBLE - Keyboard accessibility
+   ---------------------------------------- */
+.vlt-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------
+   ACCESSIBILITY: prefers-reduced-motion
+   ---------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .vlt-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .vlt-card--visible {
+    transition: none;
+  }
+
+  .vlt-card .vlt-post-border span {
+    transition: none;
+  }
+
+  .vlt-card .vlt-post-border span.top,
+  .vlt-card .vlt-post-border span.bottom {
+    transform: scaleX(1);
+  }
+
+  .vlt-card .vlt-post-border span.right,
+  .vlt-card .vlt-post-border span.left {
+    transform: scaleY(1);
+  }
+
+  .vlt-card-content {
+    opacity: 1;
+    transition: none;
+  }
+
+  .vlt-read-more-arrow {
+    transition: none;
+  }
+}
+
+/* ----------------------------------------
+   MOBILE: Touch states
+   ---------------------------------------- */
+@media (hover: none) {
+  .vlt-card-content {
+    opacity: 1;
+  }
+}
+
+/* ============================================
+   SCROLL BORDER CARD (Experience Stats Block)
+   Border draws: TOP → LEFT → BOTTOM on scroll
+   ============================================ */
+
+.scroll-border-card {
+  position: relative;
+}
+
+/* Border container */
+.scroll-border {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* All border spans - theme accent color */
+.scroll-border span {
+  position: absolute;
+  background-color: var(--color-accent);
+}
+
+/* TOP line - 2px, draws left to right */
+.scroll-border span.top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.36s 0s linear;
+}
+
+/* LEFT line - 2px, draws top to bottom */
+.scroll-border span.left {
+  top: 0;
+  left: 0;
+  width: 1.5px;
+  height: 100%;
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 0.36s 0s linear;
+}
+
+/* BOTTOM line - 2px, draws left to right */
+.scroll-border span.bottom {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.36s 0s linear;
+}
+
+/* Visible state - sequential animation: TOP → LEFT → BOTTOM */
+.scroll-border-card.is-visible .scroll-border span.top {
+  transform: scaleX(1);
+  transition-delay: 0s;
+}
+
+.scroll-border-card.is-visible .scroll-border span.left {
+  transform: scaleY(1);
+  transition-delay: 0.24s;
+}
+
+.scroll-border-card.is-visible .scroll-border span.bottom {
+  transform: scaleX(1);
+  transition-delay: 0.48s;
+}
+
+/* Reduced motion: show borders instantly */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-border span {
+    transition: none;
+  }
+
+  .scroll-border-card .scroll-border span.top,
+  .scroll-border-card .scroll-border span.bottom {
+    transform: scaleX(1);
+  }
+
+  .scroll-border-card .scroll-border span.left {
+    transform: scaleY(1);
+  }
+}
+
+/* ========== ADMIN PHOTO EDITOR - Range Slider Fix (Drag must work) ========== */
+.slider-smooth {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 9999px;
+  background: transparent;
+  outline: none;
+}
+
+/* WebKit track */
+.slider-smooth::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: rgb(42, 42, 42);
+}
+
+/* WebKit thumb */
+.slider-smooth::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--color-accent, #f59e0b);
+  cursor: pointer;
+  margin-top: -5px;
+  /* centers thumb on 8px track */
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease;
+}
+
+.slider-smooth::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.slider-smooth::-webkit-slider-thumb:active {
+  transform: scale(0.95);
+}
+
+/* Firefox track */
+.slider-smooth::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: rgb(42, 42, 42);
+}
+
+/* Firefox thumb */
+.slider-smooth::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--color-accent, #f59e0b);
+  cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.slider-smooth:focus {
+  outline: none;
+}
+
+.slider-smooth:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+}
+
+/* =====================================================
+   HoverFrame - Gilber-style animated border frame
+   ===================================================== */
+
+/* CSS Variables for customization */
+.hf {
+  --hf-color: rgba(255, 255, 255, 0.65);
+  --hf-w: 1px;
+  --hf-d: 140ms;
+}
+
+/* Frame container */
+.hf-frame {
+  overflow: visible;
+}
+
+/* Base line styles */
+.hf-line {
+  position: absolute;
+  background-color: var(--hf-color);
+  transition: transform var(--hf-d) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* TOP line: left to right */
+.hf-top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--hf-w);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition-delay: 0ms;
+}
+
+/* RIGHT line: top to bottom */
+.hf-right {
+  top: 0;
+  right: 0;
+  width: var(--hf-w);
+  height: 100%;
+  transform: scaleY(0);
+  transform-origin: center top;
+  transition-delay: 0ms;
+}
+
+/* BOTTOM line: right to left */
+.hf-bottom {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--hf-w);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition-delay: 0ms;
+}
+
+/* LEFT line: bottom to top */
+.hf-left {
+  top: 0;
+  left: 0;
+  width: var(--hf-w);
+  height: 100%;
+  transform: scaleY(0);
+  transform-origin: center bottom;
+  transition-delay: 0ms;
+}
+
+/* HOVER STATE: Sequential animation TOP → RIGHT → BOTTOM → LEFT */
+.hf:hover .hf-top {
+  transform: scaleX(1);
+  transition-delay: 0ms;
+}
+
+.hf:hover .hf-right {
+  transform: scaleY(1);
+  transition-delay: calc(var(--hf-d) * 0.85);
+}
+
+.hf:hover .hf-bottom {
+  transform: scaleX(1);
+  transition-delay: calc(var(--hf-d) * 1.7);
+}
+
+.hf:hover .hf-left {
+  transform: scaleY(1);
+  transition-delay: calc(var(--hf-d) * 2.55);
+}
+
+/* HOVER OUT: Reverse animation (optional smooth fade) */
+.hf:not(:hover) .hf-top {
+  transition-delay: calc(var(--hf-d) * 2.55);
+}
+
+.hf:not(:hover) .hf-right {
+  transition-delay: calc(var(--hf-d) * 1.7);
+}
+
+.hf:not(:hover) .hf-bottom {
+  transition-delay: calc(var(--hf-d) * 0.85);
+}
+
+.hf:not(:hover) .hf-left {
+  transition-delay: 0ms;
+}
+
+/* Reduced motion: instant border, no animation */
+@media (prefers-reduced-motion: reduce) {
+  .hf-line {
+    transition: none;
+  }
+
+  .hf:hover .hf-top,
+  .hf:hover .hf-right,
+  .hf:hover .hf-bottom,
+  .hf:hover .hf-left {
+    transform: scaleX(1);
+    transition-delay: 0ms;
+  }
+
+  .hf:hover .hf-right,
+  .hf:hover .hf-left {
+    transform: scaleY(1);
+  }
+}
+
+/* =====================================================
+   HSlider - Horizontal Section Slider (Gilber-style)
+   ===================================================== */
+
+/* Main container - full viewport, no overflow */
+.hslider {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Track - holds all slides in a row */
+.hslider-track {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  /* GPU-friendly animation */
+  will-change: transform;
+  /* Gilber-style smooth easing */
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Individual slide - full viewport */
+.hslide {
+  width: 100vw;
+  height: 100vh;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Pagination dots container */
+.hslider-dots {
+  position: fixed;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  z-index: 50;
+}
+
+/* Individual dot */
+.hslider-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: transparent;
+  border: 1px solid var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.hslider-dot:hover {
+  border-color: var(--color-accent);
+  transform: scale(1.2);
+}
+
+/* Active dot */
+.hslider-dot.active {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .hslider-track {
+    transition: none;
+  }
+}
+
+/* =====================================================
+   Experience - Scroll-triggered 3-side border
+   TOP (R→L) → LEFT (T→B) → BOTTOM (L→R)
+   ===================================================== */
+
+.exp-border-card {
+  position: relative;
+}
+
+.exp-border {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Border lines - 1px accent color, ALL hidden by default */
+.exp-border span {
+  position: absolute;
+  background-color: var(--color-accent);
+  will-change: transform;
+}
+
+/* TOP line: draws RIGHT to LEFT - starts HIDDEN */
+.exp-border .exp-top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0ms;
+}
+
+/* LEFT line: draws TOP to BOTTOM - starts HIDDEN */
+.exp-border .exp-left {
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  transform: scaleY(0);
+  transform-origin: center top;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0ms;
+}
+
+/* BOTTOM line: draws LEFT to RIGHT - starts HIDDEN */
+.exp-border .exp-bottom {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0ms;
+}
+
+/* When visible (scroll-triggered) - sequential animation */
+/* SLOW timing: 500ms each with 500ms delays for testing */
+.exp-border-card.is-visible .exp-top {
+  transform: scaleX(1);
+  transition-delay: 0ms;
+}
+
+.exp-border-card.is-visible .exp-left {
+  transform: scaleY(1);
+  transition-delay: 500ms;
+}
+
+.exp-border-card.is-visible .exp-bottom {
+  transform: scaleX(1);
+  transition-delay: 1000ms;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .exp-border span {
+    transition: none;
+    transition-delay: 0ms;
+  }
+
+  .exp-border-card.is-visible .exp-top,
+  .exp-border-card.is-visible .exp-left,
+  .exp-border-card.is-visible .exp-bottom {
+    transform: scaleX(1);
+  }
+
+  .exp-border-card.is-visible .exp-left {
+    transform: scaleY(1);
+  }
 }
