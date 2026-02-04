@@ -4,7 +4,6 @@ import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { useRef, useState, useEffect } from 'react';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import Image from 'next/image';
-import GilberCard from '@/components/ui/GilberCard';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Project {
@@ -96,14 +95,14 @@ function ProjectModal({
                     <X className="w-5 h-5" />
                 </button>
 
-                {/* Main Image Area - NO CROPPING, with blurred backdrop */}
+                {/* Main Image Area */}
                 <div
                     className="relative h-[60vh] md:h-[70vh] bg-bg/50"
                     onContextMenu={(e) => e.preventDefault()}
                 >
                     {currentImage ? (
                         <>
-                            {/* Blurred Backdrop Layer - for aesthetics only */}
+                            {/* Blurred Backdrop Layer */}
                             <div className="absolute inset-0 overflow-hidden">
                                 <Image
                                     src={currentImage}
@@ -116,7 +115,7 @@ function ProjectModal({
                                 />
                             </div>
 
-                            {/* Main Sharp Image - NO CROP, object-contain */}
+                            {/* Main Sharp Image */}
                             <Image
                                 src={currentImage}
                                 alt={project.title}
@@ -133,7 +132,7 @@ function ProjectModal({
                         </div>
                     )}
 
-                    {/* Simple Logo Watermark - Bottom Right */}
+                    {/* Logo Watermark */}
                     <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6 pointer-events-none select-none z-20 text-gray-600 opacity-60">
                         <div className="text-lg md:text-2xl font-extrabold tracking-wider leading-tight">
                             DURRAT<span className="text-gray-500">.</span>
@@ -236,16 +235,80 @@ function ProjectModal({
     );
 }
 
+// Masonry Project Card Component
+function MasonryProjectCard({
+    project,
+    index,
+    onClick
+}: {
+    project: Project;
+    index: number;
+    onClick: () => void;
+}) {
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.5, delay: index * 0.1 }}
+            className="group cursor-pointer"
+            onClick={onClick}
+        >
+            {/* Image Container - Fixed height for uniform grid */}
+            <div className="relative h-[300px] overflow-hidden mb-4">
+                {project.image_url ? (
+                    <Image
+                        src={project.image_url}
+                        alt={project.title}
+                        fill
+                        className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                    />
+                ) : (
+                    <div className="w-full h-full bg-border/20 flex items-center justify-center">
+                        <span className="text-text-muted">No image</span>
+                    </div>
+                )}
+                {/* Subtle overlay on hover */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
+            </div>
+
+            {/* Content Below Image */}
+            <div className="space-y-2">
+                {/* Year/Category Tag */}
+                <span className="text-sm font-medium text-accent">
+                    {project.year || 'Project'}
+                </span>
+
+                {/* Title */}
+                <h3 className="text-xl md:text-2xl font-bold text-text uppercase tracking-wide group-hover:text-accent transition-colors duration-300">
+                    {project.title}
+                </h3>
+
+                {/* Description */}
+                {project.description ? (
+                    <p className="text-text-muted text-sm leading-relaxed line-clamp-2">
+                        {project.description}
+                    </p>
+                ) : project.site && (
+                    <p className="text-text-muted text-sm leading-relaxed">
+                        {project.site}
+                    </p>
+                )}
+            </div>
+        </motion.div>
+    );
+}
+
 export default function Projects() {
     const ref = useRef(null);
     const isInView = useInView(ref, { once: true, margin: "-100px" });
     const [projects, setProjects] = useState<Project[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [currentPage, setCurrentPage] = useState(0);
-    const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('left');
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const [currentPage, setCurrentPage] = useState(0);
 
-    const PROJECTS_PER_PAGE = 8;
+    const PROJECTS_PER_PAGE = 6;
 
     useEffect(() => {
         const loadProjects = async () => {
@@ -265,28 +328,17 @@ export default function Projects() {
     }, []);
 
     const totalPages = Math.ceil(projects.length / PROJECTS_PER_PAGE);
-    const visibleProjects = projects.slice(currentPage * PROJECTS_PER_PAGE, (currentPage + 1) * PROJECTS_PER_PAGE);
+    const visibleProjects = projects.slice(
+        currentPage * PROJECTS_PER_PAGE,
+        (currentPage + 1) * PROJECTS_PER_PAGE
+    );
     const hasNextPage = currentPage < totalPages - 1;
     const hasPrevPage = currentPage > 0;
     const shouldAnimate = isInView && !isLoading;
 
-    const handleNextPage = () => {
-        if (hasNextPage) {
-            setSlideDirection('left');
-            setCurrentPage(prev => prev + 1);
-        }
-    };
-
-    const handlePrevPage = () => {
-        if (hasPrevPage) {
-            setSlideDirection('right');
-            setCurrentPage(prev => prev - 1);
-        }
-    };
-
     return (
         <>
-            <section id="projects" ref={ref} className="relative min-h-screen flex items-center py-32 px-6 lg:px-20 bg-card-bg">
+            <section id="projects" ref={ref} className="relative py-32 px-6 lg:px-20 bg-card-bg">
                 <div className="max-w-7xl mx-auto w-full">
                     <motion.div
                         initial="hidden"
@@ -301,158 +353,98 @@ export default function Projects() {
                             Selected <span className="accent-dot">Works</span>
                         </motion.h2>
 
-                        {/* Projects Grid - 4 columns, 2 rows with sliding animation */}
-                        <div className="relative">
-                            <div className="overflow-hidden">
-                                <AnimatePresence mode="wait" initial={false}>
-                                    <motion.div
-                                        key={currentPage}
-                                        className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6"
-                                        initial={{ x: slideDirection === 'left' ? '100%' : '-100%', opacity: 0 }}
-                                        animate={{ x: 0, opacity: 1 }}
-                                        exit={{ x: slideDirection === 'left' ? '-100%' : '100%', opacity: 0 }}
-                                        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                                    >
-                                        {isLoading ? (
-                                            // Loading skeleton
-                                            Array.from({ length: 8 }).map((_, i) => (
-                                                <div key={i} className="bg-bg animate-pulse">
-                                                    <div className="h-48 md:h-56 bg-border/20" />
-                                                    <div className="p-4">
-                                                        <div className="h-3 w-16 bg-border/20 rounded mb-2" />
-                                                        <div className="h-5 w-3/4 bg-border/20 rounded mb-2" />
-                                                        <div className="h-3 w-full bg-border/20 rounded" />
-                                                    </div>
-                                                </div>
-                                            ))
-                                        ) : visibleProjects.length > 0 ? (
-                                            visibleProjects.map((project, index) => (
-                                                <GilberCard
-                                                    key={project.id}
-                                                    index={index}
-                                                    className="group bg-bg cursor-pointer"
-                                                >
-                                                    <div onClick={() => setSelectedProject(project)}>
-                                                        {/* Image - Compact for 4-column grid */}
-                                                        <div className="relative h-48 md:h-56 overflow-hidden">
-                                                            {project.image_url ? (
-                                                                <Image
-                                                                    src={project.image_url}
-                                                                    alt={project.title}
-                                                                    fill
-                                                                    className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                                                                />
-                                                            ) : (
-                                                                <div className="w-full h-full bg-border/20 flex items-center justify-center">
-                                                                    <span className="text-text-muted">No image</span>
-                                                                </div>
-                                                            )}
-                                                            <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent opacity-60" />
-                                                        </div>
-
-                                                        {/* Content */}
-                                                        <div className="p-4">
-                                                            <span className="text-xs font-medium text-accent mb-1 block">
-                                                                {project.year || 'Project'}
-                                                            </span>
-                                                            <h3 className="text-lg font-semibold mb-1 text-text group-hover:text-accent transition-colors duration-300 line-clamp-1">
-                                                                {project.title}
-                                                            </h3>
-                                                            {project.site && (
-                                                                <p className="text-text-muted text-sm mb-2 line-clamp-1">
-                                                                    {project.site}
-                                                                </p>
-                                                            )}
-
-                                                            <div className="flex items-center text-xs text-accent font-medium">
-                                                                <span>View Project</span>
-                                                                <svg className="vlt-read-more-arrow w-3 h-3 ml-1" fill="none" viewBox="0 0 16 8" xmlns="http://www.w3.org/2000/svg">
-                                                                    <path d="M15.3536 4.35355c.1952-.19526.1952-.51184 0-.7071L12.1716.464466c-.1953-.195262-.5119-.195262-.7071 0-.1953.195262-.1953.511845 0 .707104L14.2929 4l-2.8284 2.82843c-.1953.19526-.1953.51184 0 .7071.1952.19527.5118.19527.7071 0l3.182-3.18198zM0 4.5h15v-1H0v1z" fill="currentColor" />
-                                                                </svg>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </GilberCard>
-                                            ))
-                                        ) : (
-                                            <div className="col-span-full text-center text-text-muted py-12">
-                                                No projects to display
+                        {/* Projects Grid - 3 columns, 2 rows = 6 per page */}
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={currentPage}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.3 }}
+                                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+                            >
+                                {isLoading ? (
+                                    // Loading skeleton
+                                    Array.from({ length: 6 }).map((_, i) => (
+                                        <div key={i}>
+                                            <div className="bg-bg animate-pulse h-[300px]" />
+                                            <div className="mt-4 space-y-2">
+                                                <div className="h-4 w-16 bg-border/20 rounded" />
+                                                <div className="h-6 w-3/4 bg-border/20 rounded" />
+                                                <div className="h-4 w-full bg-border/20 rounded" />
                                             </div>
-                                        )}
-                                    </motion.div>
-                                </AnimatePresence>
-                            </div>
-
-                            {/* Navigation Arrows */}
-                            {!isLoading && totalPages > 1 && (
-                                <>
-                                    {/* Previous Page Arrow (Left) */}
-                                    {hasPrevPage && (
-                                        <motion.button
-                                            onClick={handlePrevPage}
-                                            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full -ml-[155px] flex flex-col items-center gap-2 text-accent hover:text-text transition-colors group z-10"
-                                            initial={{ opacity: 0, x: -20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: 0.3 }}
-                                            aria-label="Previous projects"
-                                        >
-                                            <motion.div
-                                                className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-current flex items-center justify-center"
-                                                animate={{ x: [-2, 2, -2] }}
-                                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                                            >
-                                                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                                </svg>
-                                            </motion.div>
-                                        </motion.button>
-                                    )}
-
-                                    {/* Next Page Arrow (Right) */}
-                                    {hasNextPage && (
-                                        <motion.button
-                                            onClick={handleNextPage}
-                                            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full ml-[55px] flex flex-col items-center gap-2 text-accent hover:text-text transition-colors group z-10"
-                                            initial={{ opacity: 0, x: 20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: 0.3 }}
-                                            aria-label="More projects"
-                                        >
-                                            <span className="text-xs font-medium tracking-wider uppercase hidden md:block" style={{ writingMode: 'vertical-rl' }}>
-                                                More
-                                            </span>
-                                            <motion.div
-                                                className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-current flex items-center justify-center"
-                                                animate={{ x: [2, -2, 2] }}
-                                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                                            >
-                                                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                </svg>
-                                            </motion.div>
-                                        </motion.button>
-                                    )}
-
-                                    {/* Page Indicator - Right side aligned with cards like Gilber */}
-                                    <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[60px] flex flex-col items-center gap-3">
-                                        {Array.from({ length: totalPages }).map((_, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => {
-                                                    setSlideDirection(i > currentPage ? 'left' : 'right');
-                                                    setCurrentPage(i);
-                                                }}
-                                                className={`w-3 h-3 rounded-full transition-all duration-300 border ${i === currentPage
-                                                        ? 'bg-accent border-accent'
-                                                        : 'bg-transparent border-text-muted/50 hover:border-accent'
-                                                    }`}
-                                                aria-label={`Go to page ${i + 1}`}
-                                            />
-                                        ))}
+                                        </div>
+                                    ))
+                                ) : visibleProjects.length > 0 ? (
+                                    visibleProjects.map((project, index) => (
+                                        <MasonryProjectCard
+                                            key={project.id}
+                                            project={project}
+                                            index={index}
+                                            onClick={() => setSelectedProject(project)}
+                                        />
+                                    ))
+                                ) : (
+                                    <div className="col-span-full text-center text-text-muted py-12">
+                                        No projects to display
                                     </div>
-                                </>
-                            )}
-                        </div>
+                                )}
+                            </motion.div>
+                        </AnimatePresence>
+
+                        {/* Pagination Controls */}
+                        {!isLoading && totalPages > 1 && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.3 }}
+                                className="flex items-center justify-center gap-4 mt-12"
+                            >
+                                {/* Previous Button */}
+                                <button
+                                    onClick={() => setCurrentPage(prev => prev - 1)}
+                                    disabled={!hasPrevPage}
+                                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${hasPrevPage
+                                            ? 'border-accent text-accent hover:bg-accent hover:text-bg'
+                                            : 'border-border/30 text-border/30 cursor-not-allowed'
+                                        }`}
+                                >
+                                    <ChevronLeft className="w-5 h-5" />
+                                </button>
+
+                                {/* Page Indicators */}
+                                <div className="flex items-center gap-2">
+                                    {Array.from({ length: totalPages }).map((_, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => setCurrentPage(i)}
+                                            className={`w-3 h-3 rounded-full transition-all duration-300 ${i === currentPage
+                                                    ? 'bg-accent w-8'
+                                                    : 'bg-border/30 hover:bg-border/50'
+                                                }`}
+                                            aria-label={`Go to page ${i + 1}`}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Next Button */}
+                                <button
+                                    onClick={() => setCurrentPage(prev => prev + 1)}
+                                    disabled={!hasNextPage}
+                                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${hasNextPage
+                                            ? 'border-accent text-accent hover:bg-accent hover:text-bg'
+                                            : 'border-border/30 text-border/30 cursor-not-allowed'
+                                        }`}
+                                >
+                                    <ChevronRight className="w-5 h-5" />
+                                </button>
+
+                                {/* Page Counter */}
+                                <span className="text-text-muted text-sm ml-4">
+                                    {currentPage + 1} / {totalPages}
+                                </span>
+                            </motion.div>
+                        )}
                     </motion.div>
                 </div>
             </section>
@@ -469,3 +461,4 @@ export default function Projects() {
         </>
     );
 }
+
