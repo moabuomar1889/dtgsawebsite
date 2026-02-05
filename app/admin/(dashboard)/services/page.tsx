@@ -3,17 +3,8 @@
 import { useState, useEffect } from 'react';
 import { getServices, createService, updateService, deleteService } from '@/lib/actions';
 import type { Service } from '@/lib/supabase/types';
-
-const iconOptions = [
-    { key: 'pipeline', label: 'Pipeline' },
-    { key: 'platform', label: 'Platform' },
-    { key: 'building', label: 'Building' },
-    { key: 'wrench', label: 'Wrench' },
-    { key: 'gear', label: 'Gear' },
-    { key: 'truck', label: 'Truck' },
-    { key: 'hammer', label: 'Hammer' },
-    { key: 'drill', label: 'Drill' },
-];
+import ImageUpload from '@/components/admin/ImageUpload';
+import Image from 'next/image';
 
 export default function AdminServicesPage() {
     const [services, setServices] = useState<Service[]>([]);
@@ -23,7 +14,7 @@ export default function AdminServicesPage() {
 
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [iconKey, setIconKey] = useState('wrench');
+    const [iconUrl, setIconUrl] = useState('');
     const [sortOrder, setSortOrder] = useState(0);
 
     useEffect(() => { loadServices(); }, []);
@@ -36,18 +27,28 @@ export default function AdminServicesPage() {
     };
 
     const resetForm = () => {
-        setTitle(''); setDescription(''); setIconKey('wrench'); setSortOrder(services.length);
+        setTitle(''); setDescription(''); setIconUrl(''); setSortOrder(services.length);
         setEditingId(null); setShowForm(false);
     };
 
     const handleEdit = (item: Service) => {
-        setTitle(item.title); setDescription(item.description || ''); setIconKey(item.icon_key); setSortOrder(item.sort_order);
-        setEditingId(item.id); setShowForm(true);
+        setTitle(item.title);
+        setDescription(item.description || '');
+        setIconUrl(item.icon_url || '');
+        setSortOrder(item.sort_order);
+        setEditingId(item.id);
+        setShowForm(true);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const data = { title, description, icon_key: iconKey, sort_order: sortOrder };
+        const data = {
+            title,
+            description,
+            icon_key: 'custom', // Using custom since we have image now
+            icon_url: iconUrl || null,
+            sort_order: sortOrder
+        };
         if (editingId) await updateService(editingId, data);
         else await createService(data);
         resetForm(); loadServices();
@@ -73,21 +74,46 @@ export default function AdminServicesPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-text mb-2">Title *</label>
-                                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Icon</label>
-                                <select value={iconKey} onChange={(e) => setIconKey(e.target.value)} className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent">
-                                    {iconOptions.map(opt => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
-                                </select>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    required
+                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-text mb-2">Sort Order</label>
-                                <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent" />
+                                <input
+                                    type="number"
+                                    value={sortOrder}
+                                    onChange={(e) => setSortOrder(Number(e.target.value))}
+                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent"
+                                />
                             </div>
+
+                            {/* Icon Upload */}
+                            <div>
+                                <label className="block text-sm font-medium text-text mb-2">Service Icon</label>
+                                <div className="w-[120px]">
+                                    <ImageUpload
+                                        currentUrl={iconUrl}
+                                        onUpload={setIconUrl}
+                                        folder="services"
+                                        aspectRatio="1/1"
+                                        label=""
+                                    />
+                                </div>
+                            </div>
+
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-text mb-2">Description</label>
-                                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent resize-none" />
+                                <textarea
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    rows={3}
+                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent resize-none"
+                                />
                             </div>
                         </div>
                         <div className="flex gap-4">
@@ -103,8 +129,8 @@ export default function AdminServicesPage() {
                     <thead className="bg-bg border-b border-border">
                         <tr>
                             <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Order</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Title</th>
                             <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Icon</th>
+                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Title</th>
                             <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Description</th>
                             <th className="text-right px-6 py-4 text-sm font-medium text-text-muted">Actions</th>
                         </tr>
@@ -113,8 +139,23 @@ export default function AdminServicesPage() {
                         {services.map((item) => (
                             <tr key={item.id} className="border-b border-border last:border-0 hover:bg-bg/50">
                                 <td className="px-6 py-4 text-text">{item.sort_order}</td>
+                                <td className="px-6 py-4">
+                                    {item.icon_url ? (
+                                        <div className="w-12 h-12 relative rounded-lg overflow-hidden bg-bg">
+                                            <Image
+                                                src={item.icon_url}
+                                                alt={item.title}
+                                                fill
+                                                className="object-contain"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="w-12 h-12 rounded-lg bg-bg flex items-center justify-center text-text-muted text-xs">
+                                            No icon
+                                        </div>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 text-text font-medium">{item.title}</td>
-                                <td className="px-6 py-4 text-text-muted">{item.icon_key}</td>
                                 <td className="px-6 py-4 text-text-muted text-sm line-clamp-1">{item.description || '-'}</td>
                                 <td className="px-6 py-4 text-right">
                                     <button onClick={() => handleEdit(item)} className="text-accent hover:underline mr-4">Edit</button>

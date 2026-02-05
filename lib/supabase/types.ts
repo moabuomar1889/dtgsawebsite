@@ -72,6 +72,7 @@ export interface Service {
     title: string;
     description: string;
     icon_key: string;
+    icon_url?: string | null;
     sort_order: number;
 }
 

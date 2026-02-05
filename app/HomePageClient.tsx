@@ -7,7 +7,7 @@ import FullpageWrapper from '@/components/layout/FullpageWrapper';
 import Hero from '@/components/sections/Hero';
 import About from '@/components/sections/About';
 import Experience from '@/components/sections/Experience';
-import Services from '@/components/sections/Workforce';
+import Services from '@/components/sections/Services';
 import Projects from '@/components/sections/Projects';
 import Clients from '@/components/sections/Clients';
 import News from '@/components/sections/News';
