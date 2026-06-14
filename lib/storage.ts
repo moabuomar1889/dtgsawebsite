@@ -44,7 +44,7 @@ export async function deleteImage(url: string): Promise<{ success: boolean; erro
     const supabase = await createSupabaseClient();
 
     // Extract path from URL
-    const match = url.match(/\/storage\/v1\/object\/public\/dtgsa-assets\/(.+)$/);
+    const match = url.match(new RegExp(`/storage/v1/object/public/${BUCKET}/(.+)$`));
     if (!match) {
         return { success: false, error: 'Invalid URL' };
     }

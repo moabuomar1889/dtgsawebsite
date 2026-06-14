@@ -11,8 +11,6 @@ import type {
     Service, ServiceInsert, ServiceUpdate
 } from '@/lib/supabase/types';
 
-const SCHEMA = 'dtgsawebsite';
-
 // ========================================
 // SETTINGS
 // ========================================

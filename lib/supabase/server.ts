@@ -3,12 +3,14 @@ import { cookies } from 'next/headers';
 
 export async function createClient() {
     const cookieStore = await cookies();
+    const schema = process.env.NEXT_PUBLIC_SUPABASE_DB_SCHEMA;
+    const dbOptions = schema && schema !== 'public' ? { schema } : undefined;
 
     return createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
-            db: { schema: 'dtgsawebsite' },
+            ...(dbOptions ? { db: dbOptions } : {}),
             cookies: {
                 getAll() {
                     return cookieStore.getAll();
