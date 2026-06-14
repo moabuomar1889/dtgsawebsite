@@ -6,6 +6,7 @@ import ImageUpload from '@/components/admin/ImageUpload';
 import PhotoEditor from '@/components/admin/PhotoEditor';
 import { uploadImage } from '@/lib/storage';
 import type { Client } from '@/lib/supabase/types';
+import Image from 'next/image';
 
 export default function AdminClientsPage() {
     const [clients, setClients] = useState<Client[]>([]);
@@ -33,7 +34,6 @@ export default function AdminClientsPage() {
     const loadClients = async () => {
         setLoading(true);
         const data = await getClients();
-        console.log('Loaded clients:', data);
         setClients(data);
         setLoading(false);
     };
@@ -65,8 +65,6 @@ export default function AdminClientsPage() {
         setFormError(null);
         setSaving(true);
 
-        console.log('Submitting client:', { name, websiteUrl, logoUrl, sortOrder, isActive });
-
         try {
             if (editingId) {
                 const result = await updateClient(editingId, {
@@ -76,7 +74,6 @@ export default function AdminClientsPage() {
                     sort_order: sortOrder,
                     is_active: isActive
                 });
-                console.log('Update result:', result);
                 if (!result.success) {
                     setFormError(result.error || 'Failed to update client');
                     setSaving(false);
@@ -90,7 +87,6 @@ export default function AdminClientsPage() {
                     sort_order: sortOrder,
                     is_active: isActive
                 });
-                console.log('Add result:', result);
                 if (!result.success) {
                     setFormError(result.error || 'Failed to add client');
                     setSaving(false);
@@ -124,13 +120,13 @@ export default function AdminClientsPage() {
     };
 
     // Handle save from photo editor
-    const handleEditorSave = async (editedBlob: Blob, originalUrl: string) => {
+    const handleEditorSave = async (editedBlob: Blob) => {
         if (!editingClientId) return;
 
         try {
             // Create FormData for upload
             const formData = new FormData();
-            formData.append('file', editedBlob, `client-logo-${Date.now()}.jpg`);
+            formData.append('file', new File([editedBlob], `client-logo-${Date.now()}.webp`, { type: 'image/webp' }));
             formData.append('folder', 'clients');
 
             // Upload the edited image
@@ -274,7 +270,15 @@ export default function AdminClientsPage() {
                                 <td className="px-6 py-4 text-text">{client.sort_order}</td>
                                 <td className="px-6 py-4">
                                     {client.logo_url_bw ? (
-                                        <img src={client.logo_url_bw} alt={client.name} className="w-10 h-10 object-contain bg-white rounded" />
+                                        <Image
+                                            src={client.logo_url_bw}
+                                            alt={client.name}
+                                            width={40}
+                                            height={40}
+                                            sizes="40px"
+                                            quality={60}
+                                            className="w-10 h-10 object-contain bg-white rounded"
+                                        />
                                     ) : (
                                         <div className="w-10 h-10 bg-border rounded flex items-center justify-center text-text-muted text-xs">
                                             No logo
@@ -324,6 +328,8 @@ export default function AdminClientsPage() {
                         setEditingLogoUrl(null);
                         setEditingClientId(null);
                     }}
+                    maxExportDimension={900}
+                    exportQuality={0.86}
                 />
             )}
         </div>

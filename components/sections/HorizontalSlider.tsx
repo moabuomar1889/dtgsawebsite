@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Services from '@/components/sections/Workforce';
 import Projects from '@/components/sections/Projects';
 import Clients from '@/components/sections/Clients';

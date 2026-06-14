@@ -6,6 +6,13 @@ import ImageUpload from '@/components/admin/ImageUpload';
 import PhotoEditor from '@/components/admin/PhotoEditor';
 import type { Project, Client } from '@/lib/supabase/types';
 import { Plus, Trash2, GripVertical, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
+import {
+    formatBytes,
+    MAX_UPLOAD_INPUT_SIZE,
+    MAX_UPLOAD_OUTPUT_SIZE,
+    optimizeImageFile,
+} from '@/lib/clientImageOptimization';
 import {
     DndContext,
     closestCenter,
@@ -54,13 +61,16 @@ function SortableGalleryItem({ id, url, index, onRemove, onEdit, onPreview, onUp
 
     return (
         <div ref={setNodeRef} style={style} className="relative group">
-            <div className="aspect-video bg-bg border border-border rounded-lg overflow-hidden">
+            <div className="relative aspect-video bg-bg border border-border rounded-lg overflow-hidden">
                 {url && url !== 'uploading' ? (
                     <>
-                        <img
+                        <Image
                             src={url}
                             alt={`Gallery ${index + 1}`}
-                            className="w-full h-full object-cover cursor-pointer"
+                            fill
+                            sizes="(max-width: 768px) 50vw, 180px"
+                            quality={55}
+                            className="object-cover cursor-pointer"
                             onClick={onPreview}
                         />
                         {/* Drag handle */}
@@ -130,20 +140,20 @@ interface LightboxProps {
 }
 
 function Lightbox({ images, currentIndex, onClose, onNavigate }: LightboxProps) {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
-        if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1);
-        if (e.key === 'ArrowRight' && currentIndex < images.length - 1) onNavigate(currentIndex + 1);
-    };
-
     useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+            if (e.key === 'ArrowLeft' && currentIndex > 0) onNavigate(currentIndex - 1);
+            if (e.key === 'ArrowRight' && currentIndex < images.length - 1) onNavigate(currentIndex + 1);
+        };
+
         document.addEventListener('keydown', handleKeyDown);
         document.body.style.overflow = 'hidden';
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = '';
         };
-    }, [currentIndex]);
+    }, [currentIndex, images.length, onClose, onNavigate]);
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center" onClick={onClose}>
@@ -174,12 +184,16 @@ function Lightbox({ images, currentIndex, onClose, onNavigate }: LightboxProps) 
             )}
 
             {/* Image */}
-            <img
-                src={images[currentIndex]}
-                alt={`Gallery image ${currentIndex + 1}`}
-                className="max-w-[90vw] max-h-[90vh] object-contain"
-                onClick={(e) => e.stopPropagation()}
-            />
+            <div className="relative w-[90vw] h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <Image
+                    src={images[currentIndex]}
+                    alt={`Gallery image ${currentIndex + 1}`}
+                    fill
+                    sizes="90vw"
+                    quality={80}
+                    className="object-contain"
+                />
+            </div>
 
             {/* Counter */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/50 rounded-full text-white text-sm">
@@ -345,7 +359,7 @@ export default function AdminProjectsPage() {
         setEditingGalleryIndex(galleryIndex);
     };
 
-    const handlePhotoEditorSave = async (editedBlob: Blob, originalUrl: string) => {
+    const handlePhotoEditorSave = async (editedBlob: Blob) => {
         const { uploadImage } = await import('@/lib/storage');
         const formData = new FormData();
         formData.append('file', new File([editedBlob], 'edited-image.webp', { type: 'image/webp' }));
@@ -367,6 +381,33 @@ export default function AdminProjectsPage() {
         setEditingImageUrl(null);
     };
 
+    const uploadProjectImageFile = async (file: File, folder = 'projects/gallery') => {
+        if (!file.type.startsWith('image/')) {
+            throw new Error('Please select an image file');
+        }
+
+        if (file.size > MAX_UPLOAD_INPUT_SIZE) {
+            throw new Error(`Image must be less than ${formatBytes(MAX_UPLOAD_INPUT_SIZE)} before optimization`);
+        }
+
+        const optimized = await optimizeImageFile(file, folder);
+        if (optimized.file.size > MAX_UPLOAD_OUTPUT_SIZE) {
+            throw new Error(`Image is still ${formatBytes(optimized.file.size)} after optimization. Please choose a smaller image.`);
+        }
+
+        const { uploadImage } = await import('@/lib/storage');
+        const formData = new FormData();
+        formData.append('file', optimized.file);
+        formData.append('folder', folder);
+
+        const result = await uploadImage(formData);
+        if (!result.success || !result.url) {
+            throw new Error(result.error || 'Upload failed');
+        }
+
+        return result.url;
+    };
+
     // Lightbox handlers
     const openLightbox = (index: number) => {
         const validUrls = galleryUrls.filter(url => url && url !== 'uploading');
@@ -380,15 +421,12 @@ export default function AdminProjectsPage() {
     // Handle single image upload for gallery slot
     const handleGallerySlotUpload = async (index: number, file: File) => {
         updateGalleryImage(index, 'uploading');
-        const { uploadImage } = await import('@/lib/storage');
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('folder', 'projects/gallery');
-        const result = await uploadImage(formData);
-        if (result.success && result.url) {
-            updateGalleryImage(index, result.url);
-        } else {
+        try {
+            const uploadedUrl = await uploadProjectImageFile(file);
+            updateGalleryImage(index, uploadedUrl);
+        } catch (error) {
             updateGalleryImage(index, '');
+            alert(error instanceof Error ? error.message : 'Upload failed');
         }
     };
 
@@ -500,9 +538,10 @@ export default function AdminProjectsPage() {
                                                 const files = Array.from(e.target.files || []);
                                                 if (files.length === 0) return;
 
-                                                const { uploadImage } = await import('@/lib/storage');
                                                 const maxSlots = 15 - galleryUrls.length;
                                                 const filesToUpload = files.slice(0, maxSlots);
+                                                let failedUploads = 0;
+                                                let lastError = '';
 
                                                 setUploadProgress({ current: 0, total: filesToUpload.length, uploading: true });
 
@@ -510,17 +549,19 @@ export default function AdminProjectsPage() {
                                                     const file = filesToUpload[i];
                                                     setUploadProgress(prev => ({ ...prev, current: i + 1 }));
 
-                                                    const formData = new FormData();
-                                                    formData.append('file', file);
-                                                    formData.append('folder', 'projects/gallery');
-
-                                                    const result = await uploadImage(formData);
-                                                    if (result.success && result.url) {
-                                                        setGalleryUrls(prev => [...prev, result.url!]);
+                                                    try {
+                                                        const uploadedUrl = await uploadProjectImageFile(file);
+                                                        setGalleryUrls(prev => [...prev, uploadedUrl]);
+                                                    } catch (error) {
+                                                        failedUploads += 1;
+                                                        lastError = error instanceof Error ? error.message : 'Upload failed';
                                                     }
                                                 }
 
                                                 setUploadProgress({ current: 0, total: 0, uploading: false });
+                                                if (failedUploads > 0) {
+                                                    alert(`${failedUploads} image(s) failed. ${lastError}`);
+                                                }
                                                 e.target.value = '';
                                             }}
                                         />
@@ -557,7 +598,7 @@ export default function AdminProjectsPage() {
 
                             {galleryUrls.length === 0 ? (
                                 <p className="text-text-muted text-sm py-4">
-                                    No gallery images yet. Use "Bulk Upload" to add multiple images at once.
+                                    No gallery images yet. Use &quot;Bulk Upload&quot; to add multiple images at once.
                                 </p>
                             ) : (
                                 <DndContext
@@ -615,7 +656,15 @@ export default function AdminProjectsPage() {
                                 <td className="px-6 py-4 text-text">{project.sort_order}</td>
                                 <td className="px-6 py-4">
                                     {project.image_url ? (
-                                        <img src={project.image_url} alt={project.title} className="w-16 h-12 object-cover rounded" />
+                                        <Image
+                                            src={project.image_url}
+                                            alt={project.title}
+                                            width={64}
+                                            height={48}
+                                            sizes="64px"
+                                            quality={50}
+                                            className="w-16 h-12 object-cover rounded"
+                                        />
                                     ) : (
                                         <div className="w-16 h-12 bg-border rounded flex items-center justify-center text-text-muted text-xs">
                                             No image
@@ -666,6 +715,8 @@ export default function AdminProjectsPage() {
                     originalUrl={editingImageUrl}
                     onSave={handlePhotoEditorSave}
                     onCancel={closePhotoEditor}
+                    maxExportDimension={1600}
+                    exportQuality={0.82}
                 />
             )}
 

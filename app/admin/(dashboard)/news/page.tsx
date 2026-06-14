@@ -15,14 +15,26 @@ export default function AdminNewsPage() {
     const [excerpt, setExcerpt] = useState('');
     const [isPublished, setIsPublished] = useState(false);
 
-    useEffect(() => { loadNews(); }, []);
-
     const loadNews = async () => {
         setLoading(true);
         const data = await getNews();
         setNews(data);
         setLoading(false);
     };
+
+    useEffect(() => {
+        let isMounted = true;
+
+        void getNews().then((data) => {
+            if (!isMounted) return;
+            setNews(data);
+            setLoading(false);
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const resetForm = () => {
         setTitle(''); setDate(new Date().toISOString().split('T')[0]); setExcerpt(''); setIsPublished(false);

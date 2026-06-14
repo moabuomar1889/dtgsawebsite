@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, RotateCcw, FlipHorizontal, FlipVertical, RotateCw, ZoomIn, ZoomOut, Check, Undo2, Move } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, RotateCcw, FlipHorizontal, FlipVertical, RotateCw, ZoomIn, ZoomOut, Check, Undo2 } from 'lucide-react';
 import LivePreviewPanel from './LivePreviewPanel';
 import { PRESETS, PRESET_CATEGORIES, Preset, PresetCategory, getPresetsByCategory } from './PhotoEditorPresets';
 import {
@@ -23,6 +23,8 @@ interface PhotoEditorProps {
     originalUrl?: string;
     onSave: (editedBlob: Blob, originalUrl: string) => Promise<void>;
     onCancel: () => void;
+    maxExportDimension?: number;
+    exportQuality?: number;
 }
 
 type EditorTab = 'crop' | 'adjust' | 'presets';
@@ -78,7 +80,14 @@ const SimpleSlider = ({
     </div>
 );
 
-export default function PhotoEditor({ imageUrl, originalUrl, onSave, onCancel }: PhotoEditorProps) {
+export default function PhotoEditor({
+    imageUrl,
+    originalUrl,
+    onSave,
+    onCancel,
+    maxExportDimension = 1600,
+    exportQuality = 0.82,
+}: PhotoEditorProps) {
     // Canvas refs
     const originalCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -390,7 +399,7 @@ export default function PhotoEditor({ imageUrl, originalUrl, onSave, onCancel }:
                 setCropBox(prev => ({ ...prev, x: newX, y: newY }));
             } else if (isResizing) {
                 // Resize crop box
-                let newBox = { ...cropBoxStart };
+                const newBox = { ...cropBoxStart };
                 const ratioValue = selectedRatio !== 'free' ? getAspectRatioValue(selectedRatio) : null;
                 const imageAspect = imageDimensions.width / imageDimensions.height;
 
@@ -521,8 +530,8 @@ export default function PhotoEditor({ imageUrl, originalUrl, onSave, onCancel }:
 
             const finalCanvas = applyCropTransform(outputCanvas, cropSettings, cropWidth, cropHeight);
 
-            // Export
-            const blob = await exportToBlob(finalCanvas, 1920, 0.92);
+            // Export a web-optimized version for fast public pages.
+            const blob = await exportToBlob(finalCanvas, maxExportDimension, exportQuality);
             await onSave(blob, originalUrl || imageUrl);
         } catch (error) {
             console.error('Failed to save:', error);

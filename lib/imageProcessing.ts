@@ -401,7 +401,7 @@ export function loadImageToCanvas(url: string): Promise<HTMLCanvasElement> {
                 reject(new Error('Failed to load image'));
             };
             img.src = objectUrl;
-        } catch (error) {
+        } catch {
             // Fallback to direct loading if fetch fails
             const img = new Image();
             img.crossOrigin = 'anonymous';

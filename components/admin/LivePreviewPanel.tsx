@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 interface LivePreviewPanelProps {
     previewCanvas: HTMLCanvasElement | null;
@@ -21,25 +21,22 @@ export default function LivePreviewPanel({
     const [activeTab, setActiveTab] = useState<PreviewTab>('card');
     const cardPreviewRef = useRef<HTMLDivElement>(null);
     const modalPreviewRef = useRef<HTMLDivElement>(null);
-    const [previewUrl, setPreviewUrl] = useState<string>('');
 
-    // Convert canvas to data URL for preview
-    useEffect(() => {
-        if (previewCanvas) {
-            // Use a smaller size for preview to avoid lag
-            const previewSize = 800;
-            const scale = Math.min(previewSize / previewCanvas.width, previewSize / previewCanvas.height, 1);
+    const previewUrl = useMemo(() => {
+        if (!previewCanvas) return '';
 
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = previewCanvas.width * scale;
-            tempCanvas.height = previewCanvas.height * scale;
-            const ctx = tempCanvas.getContext('2d')!;
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(previewCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+        const previewSize = 800;
+        const scale = Math.min(previewSize / previewCanvas.width, previewSize / previewCanvas.height, 1);
 
-            setPreviewUrl(tempCanvas.toDataURL('image/jpeg', 0.85));
-        }
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = previewCanvas.width * scale;
+        tempCanvas.height = previewCanvas.height * scale;
+        const ctx = tempCanvas.getContext('2d')!;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(previewCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+        return tempCanvas.toDataURL('image/jpeg', 0.85);
     }, [previewCanvas]);
 
     const tabs: { id: PreviewTab; label: string; description: string }[] = [
@@ -103,6 +100,7 @@ export default function LivePreviewPanel({
                             >
                                 {previewUrl ? (
                                     <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                             src={previewUrl}
                                             alt="Card Preview"
@@ -132,6 +130,7 @@ export default function LivePreviewPanel({
                             >
                                 {previewUrl ? (
                                     <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                             src={previewUrl}
                                             alt="Card Preview Mobile"
@@ -169,17 +168,10 @@ export default function LivePreviewPanel({
                                 aspectRatio: '16/10' // Simulate modal proportions
                             }}
                         >
-                            {/* Blurred Background (like real modal) */}
-                            {previewUrl && (
-                                <div
-                                    className="absolute inset-0 bg-cover bg-center blur-2xl opacity-30 scale-110"
-                                    style={{ backgroundImage: `url(${previewUrl})` }}
-                                />
-                            )}
-
                             {/* Main Image (object-contain) */}
                             <div className="relative w-full h-full flex items-center justify-center p-2">
                                 {previewUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
                                     <img
                                         src={previewUrl}
                                         alt="Modal Preview"
@@ -196,7 +188,7 @@ export default function LivePreviewPanel({
                         {/* Info */}
                         <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                             <p className="text-xs text-green-400">
-                                <strong>Note:</strong> Modal gallery uses <code className="bg-bg px-1 rounded">object-contain</code> so the full image is always visible with a blurred backdrop.
+                                <strong>Note:</strong> Modal gallery uses <code className="bg-bg px-1 rounded">object-contain</code> so the full image is always visible.
                             </p>
                         </div>
                     </div>

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { heroStagger, heroItem } from '@/lib/motion';
 import { useEffect, useState } from 'react';
 import { getSettings } from '@/lib/actions';
+import Image from 'next/image';
 
 export default function Hero() {
     const [heroImageUrl, setHeroImageUrl] = useState('/placeholders/hero-bg.jpg');
@@ -22,9 +23,14 @@ export default function Hero() {
         <section id="home" className="relative h-screen flex items-center justify-center overflow-hidden">
             {/* Background Image */}
             <div className="absolute inset-0 z-0">
-                <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${heroImageUrl})` }}
+                <Image
+                    src={heroImageUrl}
+                    alt=""
+                    fill
+                    priority
+                    sizes="100vw"
+                    quality={75}
+                    className="object-cover"
                 />
                 {/* Dark overlay */}
                 <div className="absolute inset-0 bg-bg/40" />

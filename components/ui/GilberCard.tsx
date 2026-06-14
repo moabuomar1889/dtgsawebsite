@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, ReactNode, CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface GilberCardProps {
     children: ReactNode;
@@ -21,7 +21,7 @@ export default function GilberCard({
     index = 0,
     style
 }: GilberCardProps) {
-    const cardRef = useRef<HTMLDivElement>(null);
+    const cardRef = useRef<HTMLElement>(null);
     const [isVisible, setIsVisible] = useState(false);
 
     // Scroll reveal for card fade-in
@@ -32,8 +32,8 @@ export default function GilberCard({
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         if (prefersReducedMotion) {
-            setIsVisible(true);
-            return;
+            const frame = requestAnimationFrame(() => setIsVisible(true));
+            return () => cancelAnimationFrame(frame);
         }
 
         const observer = new IntersectionObserver(
@@ -58,13 +58,9 @@ export default function GilberCard({
         return () => observer.disconnect();
     }, [index]);
 
-    return (
-        <Component
-            ref={cardRef as any}
-            className={`vlt-card ${isVisible ? 'vlt-card--visible' : ''} ${className}`}
-            style={style}
-        >
-            {/* 4-span Border: TOP → RIGHT → BOTTOM → LEFT (clockwise) */}
+    const content = (
+        <>
+            {/* 4-span Border: TOP -> RIGHT -> BOTTOM -> LEFT (clockwise) */}
             <div className="vlt-post-border">
                 <span className="top"></span>
                 <span className="right"></span>
@@ -76,6 +72,28 @@ export default function GilberCard({
             <div className="vlt-card-content">
                 {children}
             </div>
-        </Component>
+        </>
+    );
+
+    if (Component === 'article') {
+        return (
+            <article
+                ref={cardRef as RefObject<HTMLElement>}
+                className={`vlt-card ${isVisible ? 'vlt-card--visible' : ''} ${className}`}
+                style={style}
+            >
+                {content}
+            </article>
+        );
+    }
+
+    return (
+        <div
+            ref={cardRef as RefObject<HTMLDivElement>}
+            className={`vlt-card ${isVisible ? 'vlt-card--visible' : ''} ${className}`}
+            style={style}
+        >
+            {content}
+        </div>
     );
 }

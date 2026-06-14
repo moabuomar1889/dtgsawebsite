@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useInView, AnimatePresence } from 'framer-motion';
-import { useRef, useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import Image from 'next/image';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -41,6 +41,18 @@ function ProjectModal({
 
     const [currentIndex, setCurrentIndex] = useState(0);
 
+    const goToNext = useCallback(() => {
+        if (allImages.length > 0) {
+            setCurrentIndex((prev) => (prev + 1) % allImages.length);
+        }
+    }, [allImages.length]);
+
+    const goToPrev = useCallback(() => {
+        if (allImages.length > 0) {
+            setCurrentIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+        }
+    }, [allImages.length]);
+
     // Close on escape key and lock scroll
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -55,19 +67,7 @@ function ProjectModal({
             document.removeEventListener('keydown', handleEscape);
             document.body.style.overflow = '';
         };
-    }, [onClose, currentIndex]);
-
-    const goToNext = () => {
-        if (allImages.length > 0) {
-            setCurrentIndex((prev) => (prev + 1) % allImages.length);
-        }
-    };
-
-    const goToPrev = () => {
-        if (allImages.length > 0) {
-            setCurrentIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
-        }
-    };
+    }, [onClose, goToNext, goToPrev]);
 
     const currentImage = allImages[currentIndex];
 
@@ -101,31 +101,16 @@ function ProjectModal({
                     onContextMenu={(e) => e.preventDefault()}
                 >
                     {currentImage ? (
-                        <>
-                            {/* Blurred Backdrop Layer */}
-                            <div className="absolute inset-0 overflow-hidden">
-                                <Image
-                                    src={currentImage}
-                                    alt=""
-                                    fill
-                                    className="object-cover blur-2xl opacity-30 scale-110"
-                                    sizes="100vw"
-                                    priority={false}
-                                    draggable={false}
-                                />
-                            </div>
-
-                            {/* Main Sharp Image */}
-                            <Image
-                                src={currentImage}
-                                alt={project.title}
-                                fill
-                                className="object-contain z-10"
-                                sizes="(max-width: 768px) 100vw, 80vw"
-                                priority
-                                draggable={false}
-                            />
-                        </>
+                        <Image
+                            src={currentImage}
+                            alt={project.title}
+                            fill
+                            className="object-contain z-10"
+                            sizes="(max-width: 768px) 100vw, 80vw"
+                            quality={80}
+                            priority
+                            draggable={false}
+                        />
                     ) : (
                         <div className="w-full h-full bg-border/20 flex items-center justify-center">
                             <span className="text-text-muted">No image</span>
@@ -185,6 +170,8 @@ function ProjectModal({
                                     alt={`Thumbnail ${index + 1}`}
                                     fill
                                     className="object-cover"
+                                    sizes="64px"
+                                    quality={45}
                                 />
                             </button>
                         ))}
@@ -263,6 +250,7 @@ function MasonryProjectCard({
                         fill
                         className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                         sizes="(max-width: 768px) 100vw, 33vw"
+                        quality={70}
                     />
                 ) : (
                     <div className="w-full h-full bg-border/20 flex items-center justify-center">

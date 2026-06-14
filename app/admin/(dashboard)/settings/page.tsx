@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '@/lib/actions';
-import type { Settings } from '@/lib/supabase/types';
 import ImageUpload from '@/components/admin/ImageUpload';
 
 export default function AdminSettingsPage() {
-    const [settings, setSettings] = useState<Settings | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -23,26 +21,30 @@ export default function AdminSettingsPage() {
     const [aboutImageUrl, setAboutImageUrl] = useState('');
 
     useEffect(() => {
-        loadSettings();
-    }, []);
+        let isMounted = true;
 
-    const loadSettings = async () => {
-        setLoading(true);
-        const data = await getSettings();
-        if (data) {
-            setSettings(data);
-            setAccentColor(data.accent_color);
-            setSiteTitle(data.site_title);
-            setHeroHeadline(data.hero_headline);
-            setHeroSubheadline(data.hero_subheadline);
-            setContactEmail(data.contact_email);
-            setContactPhone(data.contact_phone);
-            setContactAddress(data.contact_address);
-            setHeroImageUrl(data.hero_image_url || '');
-            setAboutImageUrl(data.about_image_url || '');
-        }
-        setLoading(false);
-    };
+        void getSettings().then((data) => {
+            if (!isMounted) return;
+
+            if (data) {
+                setAccentColor(data.accent_color);
+                setSiteTitle(data.site_title);
+                setHeroHeadline(data.hero_headline);
+                setHeroSubheadline(data.hero_subheadline);
+                setContactEmail(data.contact_email);
+                setContactPhone(data.contact_phone);
+                setContactAddress(data.contact_address);
+                setHeroImageUrl(data.hero_image_url || '');
+                setAboutImageUrl(data.about_image_url || '');
+            }
+
+            setLoading(false);
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     // Apply accent color to CSS variables immediately (optimistic update)
     useEffect(() => {

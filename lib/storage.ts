@@ -3,6 +3,34 @@
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 
 const BUCKET = 'dtgsa-website-assets';
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_UPLOAD_FOLDERS = new Set([
+    'clients',
+    'images',
+    'news',
+    'projects',
+    'projects/gallery',
+    'services',
+    'settings',
+]);
+
+function getFileExtension(file: File): string {
+    const mimeExtension = {
+        'image/avif': 'avif',
+        'image/gif': 'gif',
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/svg+xml': 'svg',
+        'image/webp': 'webp',
+    }[file.type];
+
+    if (mimeExtension) {
+        return mimeExtension;
+    }
+
+    const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return extension || 'img';
+}
 
 export async function uploadImage(
     formData: FormData
@@ -16,14 +44,27 @@ export async function uploadImage(
         return { success: false, error: 'No file provided' };
     }
 
+    if (!file.type.startsWith('image/')) {
+        return { success: false, error: 'Only image uploads are allowed' };
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+        return { success: false, error: 'Image must be less than 5MB after optimization' };
+    }
+
+    if (!ALLOWED_UPLOAD_FOLDERS.has(folder)) {
+        return { success: false, error: 'Upload folder is not allowed' };
+    }
+
     // Generate unique filename
-    const ext = file.name.split('.').pop();
+    const ext = getFileExtension(file);
     const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
     const { data, error } = await supabase.storage
         .from(BUCKET)
         .upload(filename, file, {
-            cacheControl: '3600',
+            cacheControl: '31536000',
+            contentType: file.type || undefined,
             upsert: false,
         });
 

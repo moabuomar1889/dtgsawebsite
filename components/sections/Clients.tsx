@@ -6,6 +6,7 @@ import { staggerContainer, staggerItem } from '@/lib/motion';
 import { getClients } from '@/lib/actions';
 import type { Client } from '@/lib/supabase/types';
 import GilberCard from '@/components/ui/GilberCard';
+import Image from 'next/image';
 
 export default function Clients() {
     const ref = useRef(null);
@@ -44,7 +45,7 @@ export default function Clients() {
                         </h2>
 
                         <p className="text-text-muted max-w-2xl mx-auto">
-                            We've had the privilege of working with industry leaders who trust our expertise.
+                            We&apos;ve had the privilege of working with industry leaders who trust our expertise.
                         </p>
                     </motion.div>
 
@@ -69,11 +70,16 @@ export default function Clients() {
                                     {/* Client Logo */}
                                     <div className="w-full h-full flex items-center justify-center p-3 overflow-hidden">
                                         {client.logo_url_bw ? (
-                                            <img
-                                                src={client.logo_url_bw}
-                                                alt={client.name}
-                                                className="max-w-full max-h-full object-contain filter grayscale group-hover:grayscale-0 transition-all duration-500"
-                                            />
+                                            <div className="relative w-full h-full">
+                                                <Image
+                                                    src={client.logo_url_bw}
+                                                    alt={client.name}
+                                                    fill
+                                                    sizes="(max-width: 640px) 45vw, 180px"
+                                                    quality={70}
+                                                    className="object-contain filter grayscale group-hover:grayscale-0 transition-all duration-500"
+                                                />
+                                            </div>
                                         ) : (
                                             <span className="text-text-muted text-xs text-center">{client.name}</span>
                                         )}

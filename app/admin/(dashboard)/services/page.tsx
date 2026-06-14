@@ -17,14 +17,26 @@ export default function AdminServicesPage() {
     const [iconUrl, setIconUrl] = useState('');
     const [sortOrder, setSortOrder] = useState(0);
 
-    useEffect(() => { loadServices(); }, []);
-
     const loadServices = async () => {
         setLoading(true);
         const data = await getServices();
         setServices(data);
         setLoading(false);
     };
+
+    useEffect(() => {
+        let isMounted = true;
+
+        void getServices().then((data) => {
+            if (!isMounted) return;
+            setServices(data);
+            setLoading(false);
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const resetForm = () => {
         setTitle(''); setDescription(''); setIconUrl(''); setSortOrder(services.length);

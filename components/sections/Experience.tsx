@@ -38,8 +38,8 @@ function ScrollBorderCard({ children }: { children: React.ReactNode }) {
 
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (prefersReducedMotion) {
-            setIsVisible(true);
-            return;
+            const frame = requestAnimationFrame(() => setIsVisible(true));
+            return () => cancelAnimationFrame(frame);
         }
 
         const observer = new IntersectionObserver(

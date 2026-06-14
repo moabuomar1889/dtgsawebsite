@@ -1,24 +1,28 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { uploadImage } from '@/lib/storage';
+import {
+    formatBytes,
+    MAX_UPLOAD_INPUT_SIZE,
+    MAX_UPLOAD_OUTPUT_SIZE,
+    optimizeImageFile,
+} from '@/lib/clientImageOptimization';
 
 interface ImageUploadProps {
     currentUrl?: string | null;
     onUpload: (url: string) => void;
     folder?: string;
     label?: string;
-    aspectRatio?: string; // e.g., "16/9", "1/1", "4/3"
-    // Dimension validation props
+    aspectRatio?: string;
     minWidth?: number;
     minHeight?: number;
     maxWidth?: number;
     maxHeight?: number;
-    recommendedDimensions?: string; // e.g., "400×400px"
-    compact?: boolean; // Smaller version for gallery items
+    recommendedDimensions?: string;
+    compact?: boolean;
 }
 
-// Helper function to validate image dimensions
 const validateImageDimensions = (
     file: File,
     minWidth?: number,
@@ -27,59 +31,66 @@ const validateImageDimensions = (
     maxHeight?: number
 ): Promise<{ valid: boolean; width: number; height: number; error?: string }> => {
     return new Promise((resolve) => {
+        const objectUrl = URL.createObjectURL(file);
         const img = new Image();
+
+        const finish = (result: { valid: boolean; width: number; height: number; error?: string }) => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(result);
+        };
+
         img.onload = () => {
             const width = img.naturalWidth;
             const height = img.naturalHeight;
 
             if (minWidth && width < minWidth) {
-                resolve({
+                finish({
                     valid: false,
                     width,
                     height,
-                    error: `Image width must be at least ${minWidth}px (uploaded: ${width}px)`
+                    error: `Image width must be at least ${minWidth}px (uploaded: ${width}px)`,
                 });
                 return;
             }
 
             if (minHeight && height < minHeight) {
-                resolve({
+                finish({
                     valid: false,
                     width,
                     height,
-                    error: `Image height must be at least ${minHeight}px (uploaded: ${height}px)`
+                    error: `Image height must be at least ${minHeight}px (uploaded: ${height}px)`,
                 });
                 return;
             }
 
             if (maxWidth && width > maxWidth) {
-                resolve({
+                finish({
                     valid: false,
                     width,
                     height,
-                    error: `Image width must not exceed ${maxWidth}px (uploaded: ${width}px)`
+                    error: `Image width must not exceed ${maxWidth}px (uploaded: ${width}px)`,
                 });
                 return;
             }
 
             if (maxHeight && height > maxHeight) {
-                resolve({
+                finish({
                     valid: false,
                     width,
                     height,
-                    error: `Image height must not exceed ${maxHeight}px (uploaded: ${height}px)`
+                    error: `Image height must not exceed ${maxHeight}px (uploaded: ${height}px)`,
                 });
                 return;
             }
 
-            resolve({ valid: true, width, height });
+            finish({ valid: true, width, height });
         };
 
         img.onerror = () => {
-            resolve({ valid: false, width: 0, height: 0, error: 'Failed to load image for validation' });
+            finish({ valid: false, width: 0, height: 0, error: 'Failed to load image for validation' });
         };
 
-        img.src = URL.createObjectURL(file);
+        img.src = objectUrl;
     });
 };
 
@@ -99,30 +110,34 @@ export default function ImageUpload({
     const [uploading, setUploading] = useState(false);
     const [preview, setPreview] = useState<string | null>(currentUrl || null);
     const [error, setError] = useState<string | null>(null);
+    const [optimizationInfo, setOptimizationInfo] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setPreview(currentUrl || null);
+    }, [currentUrl]);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Validate file type
+        setError(null);
+        setOptimizationInfo(null);
+
         if (!file.type.startsWith('image/')) {
             setError('Please select an image file');
             return;
         }
 
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            setError('Image must be less than 5MB');
+        if (file.size > MAX_UPLOAD_INPUT_SIZE) {
+            setError(`Image must be less than ${formatBytes(MAX_UPLOAD_INPUT_SIZE)} before optimization`);
             return;
         }
 
-        // Validate dimensions if constraints are set
         if (minWidth || minHeight || maxWidth || maxHeight) {
             const validation = await validateImageDimensions(file, minWidth, minHeight, maxWidth, maxHeight);
             if (!validation.valid) {
                 setError(validation.error || 'Image dimensions are invalid');
-                // Reset file input
                 if (inputRef.current) {
                     inputRef.current.value = '';
                 }
@@ -130,49 +145,63 @@ export default function ImageUpload({
             }
         }
 
-        setError(null);
         setUploading(true);
 
-        // Show preview immediately
         const reader = new FileReader();
-        reader.onload = (e) => {
-            setPreview(e.target?.result as string);
+        reader.onload = (event) => {
+            setPreview(event.target?.result as string);
         };
         reader.readAsDataURL(file);
 
-        // Upload to Supabase
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('folder', folder);
+        try {
+            const optimized = await optimizeImageFile(file, folder);
 
-        const result = await uploadImage(formData);
+            if (optimized.file.size > MAX_UPLOAD_OUTPUT_SIZE) {
+                throw new Error(`Image is still ${formatBytes(optimized.file.size)} after optimization. Please choose a smaller image.`);
+            }
 
-        if (result.success && result.url) {
-            onUpload(result.url);
-            setPreview(result.url);
-        } else {
-            setError(result.error || 'Upload failed');
+            if (optimized.optimized) {
+                setOptimizationInfo(`Optimized ${formatBytes(optimized.originalSize)} to ${formatBytes(optimized.optimizedSize)}`);
+            }
+
+            const formData = new FormData();
+            formData.append('file', optimized.file);
+            formData.append('folder', folder);
+
+            const result = await uploadImage(formData);
+
+            if (result.success && result.url) {
+                onUpload(result.url);
+                setPreview(result.url);
+            } else {
+                throw new Error(result.error || 'Upload failed');
+            }
+        } catch (uploadError) {
+            setError(uploadError instanceof Error ? uploadError.message : 'Upload failed');
             setPreview(currentUrl || null);
+        } finally {
+            setUploading(false);
+            if (inputRef.current) {
+                inputRef.current.value = '';
+            }
         }
-
-        setUploading(false);
     };
 
     const handleRemove = () => {
         setPreview(null);
+        setOptimizationInfo(null);
         onUpload('');
         if (inputRef.current) {
             inputRef.current.value = '';
         }
     };
 
-    // Build dimension requirements text
     const getDimensionText = () => {
         if (recommendedDimensions) {
             return recommendedDimensions;
         }
         if (minWidth && minHeight) {
-            return `Min: ${minWidth}×${minHeight}px`;
+            return `Min: ${minWidth}x${minHeight}px`;
         }
         return null;
     };
@@ -192,6 +221,7 @@ export default function ImageUpload({
             >
                 {preview ? (
                     <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={preview}
                             alt="Preview"
@@ -200,8 +230,8 @@ export default function ImageUpload({
                         <div className={`absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center ${compact ? 'gap-2' : 'gap-4'}`}>
                             <button
                                 type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
+                                onClick={(event) => {
+                                    event.stopPropagation();
                                     inputRef.current?.click();
                                 }}
                                 className={`${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} bg-accent text-white rounded-lg`}
@@ -210,8 +240,8 @@ export default function ImageUpload({
                             </button>
                             <button
                                 type="button"
-                                onClick={(e) => {
-                                    e.stopPropagation();
+                                onClick={(event) => {
+                                    event.stopPropagation();
                                     handleRemove();
                                 }}
                                 className={`${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} bg-red-500 text-white rounded-lg`}
@@ -230,7 +260,7 @@ export default function ImageUpload({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                                 {!compact && <span className="text-sm">Click to upload</span>}
-                                {!compact && <span className="text-xs mt-1">Max 5MB</span>}
+                                {!compact && <span className="text-xs mt-1">Max {formatBytes(MAX_UPLOAD_INPUT_SIZE)}, optimized before upload</span>}
                                 {!compact && dimensionText && (
                                     <span className="text-xs mt-1 text-accent">{dimensionText}</span>
                                 )}
@@ -240,11 +270,14 @@ export default function ImageUpload({
                 )}
             </div>
 
+            {optimizationInfo && !error && (
+                <p className="text-xs text-green-400">{optimizationInfo}</p>
+            )}
+
             {error && (
                 <p className="text-sm text-red-400">{error}</p>
             )}
 
-            {/* Show dimension requirements below upload area */}
             {dimensionText && !error && (
                 <p className="text-xs text-text-muted">Recommended: {dimensionText}</p>
             )}

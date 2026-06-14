@@ -6,6 +6,7 @@ import { useRef, useState, useEffect } from 'react';
 import { scrollReveal, staggerContainer, staggerItem } from '@/lib/motion';
 import { getYearsOfExperience } from '@/lib/data';
 import { getSettings } from '@/lib/actions';
+import Image from 'next/image';
 
 export default function About() {
     const ref = useRef(null);
@@ -83,9 +84,13 @@ export default function About() {
                         variants={scrollReveal}
                         className="relative h-[500px] rounded-lg overflow-hidden"
                     >
-                        <div
-                            className="absolute inset-0 bg-cover bg-center"
-                            style={{ backgroundImage: `url(${aboutImageUrl || '/placeholders/project-7.jpg'})` }}
+                        <Image
+                            src={aboutImageUrl || '/placeholders/project-7.jpg'}
+                            alt=""
+                            fill
+                            sizes="(max-width: 1024px) 100vw, 50vw"
+                            quality={75}
+                            className="object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-bg via-transparent" />
                     </motion.div>

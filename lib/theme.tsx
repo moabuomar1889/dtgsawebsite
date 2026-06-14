@@ -18,6 +18,10 @@ const DEFAULT_THEME: Theme = {
   accentColor: '#ef4444',
 };
 
+function applyTheme(newTheme: Theme) {
+  document.documentElement.style.setProperty('--color-accent', newTheme.accentColor);
+}
+
 export function ThemeProvider(props: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(DEFAULT_THEME);
 
@@ -26,17 +30,21 @@ export function ThemeProvider(props: { children: ReactNode }) {
     if (savedTheme) {
       try {
         const parsedTheme = JSON.parse(savedTheme);
-        setThemeState(parsedTheme);
-        applyTheme(parsedTheme);
+        let cancelled = false;
+        queueMicrotask(() => {
+          if (cancelled) return;
+          setThemeState(parsedTheme);
+          applyTheme(parsedTheme);
+        });
+
+        return () => {
+          cancelled = true;
+        };
       } catch (error) {
         console.error('Failed to parse saved theme:', error);
       }
     }
   }, []);
-
-  const applyTheme = (newTheme: Theme) => {
-    document.documentElement.style.setProperty('--color-accent', newTheme.accentColor);
-  };
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);

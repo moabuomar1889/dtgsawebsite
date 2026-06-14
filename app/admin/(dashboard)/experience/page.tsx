@@ -17,14 +17,26 @@ export default function AdminExperiencePage() {
     const [description, setDescription] = useState('');
     const [sortOrder, setSortOrder] = useState(0);
 
-    useEffect(() => { loadExperience(); }, []);
-
     const loadExperience = async () => {
         setLoading(true);
         const data = await getExperience();
         setExperience(data);
         setLoading(false);
     };
+
+    useEffect(() => {
+        let isMounted = true;
+
+        void getExperience().then((data) => {
+            if (!isMounted) return;
+            setExperience(data);
+            setLoading(false);
+        });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const resetForm = () => {
         setTitle(''); setCompany(''); setStartYear(new Date().getFullYear()); setEndYear(null); setDescription(''); setSortOrder(experience.length);
