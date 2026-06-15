@@ -2,6 +2,7 @@
 
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { refreshPublicDataSnapshot } from '@/lib/data-fetching';
 import type {
     Settings, SettingsUpdate,
     Client, ClientInsert, ClientUpdate,
@@ -10,6 +11,11 @@ import type {
     Experience, ExperienceInsert, ExperienceUpdate,
     Service, ServiceInsert, ServiceUpdate
 } from '@/lib/supabase/types';
+
+async function refreshPublicSection(key: Parameters<typeof refreshPublicDataSnapshot>[0]) {
+    await refreshPublicDataSnapshot(key);
+    revalidatePath('/');
+}
 
 // ========================================
 // SETTINGS
@@ -51,8 +57,8 @@ export async function updateSettings(updates: SettingsUpdate): Promise<{ success
         return { success: false, error: error.message };
     }
 
-    revalidatePath('/');
     revalidatePath('/admin/settings');
+    await refreshPublicSection('settings');
     return { success: true };
 }
 
@@ -93,7 +99,7 @@ export async function addClient(client: ClientInsert): Promise<{ success: boolea
     }
 
     revalidatePath('/admin/clients');
-    revalidatePath('/');
+    await refreshPublicSection('clients');
     return { success: true, data };
 }
 
@@ -109,7 +115,7 @@ export async function updateClient(id: string, updates: ClientUpdate): Promise<{
     }
 
     revalidatePath('/admin/clients');
-    revalidatePath('/');
+    await refreshPublicSection('clients');
     return { success: true };
 }
 
@@ -125,7 +131,7 @@ export async function deleteClient(id: string): Promise<{ success: boolean; erro
     }
 
     revalidatePath('/admin/clients');
-    revalidatePath('/');
+    await refreshPublicSection('clients');
     return { success: true };
 }
 
@@ -160,7 +166,7 @@ export async function createProject(project: ProjectInsert): Promise<{ success: 
     }
 
     revalidatePath('/admin/projects');
-    revalidatePath('/');
+    await refreshPublicSection('projects');
     return { success: true, data };
 }
 
@@ -176,7 +182,7 @@ export async function updateProject(id: string, updates: ProjectUpdate): Promise
     }
 
     revalidatePath('/admin/projects');
-    revalidatePath('/');
+    await refreshPublicSection('projects');
     return { success: true };
 }
 
@@ -192,7 +198,7 @@ export async function deleteProject(id: string): Promise<{ success: boolean; err
     }
 
     revalidatePath('/admin/projects');
-    revalidatePath('/');
+    await refreshPublicSection('projects');
     return { success: true };
 }
 
@@ -233,7 +239,7 @@ export async function createNews(news: NewsInsert): Promise<{ success: boolean; 
     }
 
     revalidatePath('/admin/news');
-    revalidatePath('/');
+    await refreshPublicSection('news');
     return { success: true, data };
 }
 
@@ -249,7 +255,7 @@ export async function updateNews(id: string, updates: NewsUpdate): Promise<{ suc
     }
 
     revalidatePath('/admin/news');
-    revalidatePath('/');
+    await refreshPublicSection('news');
     return { success: true };
 }
 
@@ -265,7 +271,7 @@ export async function deleteNews(id: string): Promise<{ success: boolean; error?
     }
 
     revalidatePath('/admin/news');
-    revalidatePath('/');
+    await refreshPublicSection('news');
     return { success: true };
 }
 
@@ -300,7 +306,7 @@ export async function createExperience(exp: ExperienceInsert): Promise<{ success
     }
 
     revalidatePath('/admin/experience');
-    revalidatePath('/');
+    await refreshPublicSection('experience');
     return { success: true, data };
 }
 
@@ -316,7 +322,7 @@ export async function updateExperience(id: string, updates: ExperienceUpdate): P
     }
 
     revalidatePath('/admin/experience');
-    revalidatePath('/');
+    await refreshPublicSection('experience');
     return { success: true };
 }
 
@@ -332,7 +338,7 @@ export async function deleteExperience(id: string): Promise<{ success: boolean; 
     }
 
     revalidatePath('/admin/experience');
-    revalidatePath('/');
+    await refreshPublicSection('experience');
     return { success: true };
 }
 
@@ -367,7 +373,7 @@ export async function createService(service: ServiceInsert): Promise<{ success: 
     }
 
     revalidatePath('/admin/services');
-    revalidatePath('/');
+    await refreshPublicSection('services');
     return { success: true, data };
 }
 
@@ -383,7 +389,7 @@ export async function updateService(id: string, updates: ServiceUpdate): Promise
     }
 
     revalidatePath('/admin/services');
-    revalidatePath('/');
+    await refreshPublicSection('services');
     return { success: true };
 }
 
@@ -399,7 +405,7 @@ export async function deleteService(id: string): Promise<{ success: boolean; err
     }
 
     revalidatePath('/admin/services');
-    revalidatePath('/');
+    await refreshPublicSection('services');
     return { success: true };
 }
 

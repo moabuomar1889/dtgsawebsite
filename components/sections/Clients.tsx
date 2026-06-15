@@ -3,7 +3,6 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef, useEffect, useState } from 'react';
 import { staggerContainer, staggerItem } from '@/lib/motion';
-import { getClients } from '@/lib/actions';
 import type { Client } from '@/lib/supabase/types';
 import GilberCard from '@/components/ui/GilberCard';
 import Image from 'next/image';
@@ -17,8 +16,11 @@ export default function Clients() {
     useEffect(() => {
         const loadClients = async () => {
             try {
-                const data = await getClients(true);
-                setClients(data);
+                const response = await fetch('/api/clients');
+                if (response.ok) {
+                    const data = await response.json();
+                    setClients(data);
+                }
             } catch (error) {
                 console.error('Error loading clients:', error);
             } finally {
