@@ -27,7 +27,7 @@ function SkillBar({ name, percentage, delay }: { name: string; percentage: numbe
     );
 }
 
-// Scroll-triggered 3-side border.
+// Scroll-triggered 3-side border (TOP → LEFT → BOTTOM)
 function ScrollBorderCard({ children }: { children: React.ReactNode }) {
     const cardRef = useRef<HTMLDivElement>(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -51,7 +51,7 @@ function ScrollBorderCard({ children }: { children: React.ReactNode }) {
                     }
                 });
             },
-            { threshold: 0.45 }
+            { threshold: 0.2 }
         );
 
         observer.observe(card);
@@ -63,14 +63,12 @@ function ScrollBorderCard({ children }: { children: React.ReactNode }) {
             ref={cardRef}
             className={`exp-border-card p-12 inline-block relative ${isVisible ? 'is-visible' : ''}`}
         >
-            <svg className="exp-border" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                <path
-                    className="exp-border-path"
-                    d="M 100 0 H 0 V 100 H 100"
-                    pathLength="300"
-                    vectorEffect="non-scaling-stroke"
-                />
-            </svg>
+            {/* 3-sided border: TOP (R→L) → LEFT (T→B) → BOTTOM (L→R) */}
+            <div className="exp-border">
+                <span className="exp-top"></span>
+                <span className="exp-left"></span>
+                <span className="exp-bottom"></span>
+            </div>
             {children}
         </div>
     );
