@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
+import { DEFAULT_ACCENT_COLOR } from '@/lib/theme-colors';
 
 interface Theme {
   accentColor: string;
@@ -15,41 +16,14 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const DEFAULT_THEME: Theme = {
-  accentColor: '#ef4444',
+  accentColor: DEFAULT_ACCENT_COLOR,
 };
-
-function applyTheme(newTheme: Theme) {
-  document.documentElement.style.setProperty('--color-accent', newTheme.accentColor);
-}
 
 export function ThemeProvider(props: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(DEFAULT_THEME);
 
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('durrat-theme');
-    if (savedTheme) {
-      try {
-        const parsedTheme = JSON.parse(savedTheme);
-        let cancelled = false;
-        queueMicrotask(() => {
-          if (cancelled) return;
-          setThemeState(parsedTheme);
-          applyTheme(parsedTheme);
-        });
-
-        return () => {
-          cancelled = true;
-        };
-      } catch (error) {
-        console.error('Failed to parse saved theme:', error);
-      }
-    }
-  }, []);
-
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    applyTheme(newTheme);
-    localStorage.setItem('durrat-theme', JSON.stringify(newTheme));
   };
 
   const updateAccentColor = (color: string) => {

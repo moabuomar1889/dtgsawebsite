@@ -2,7 +2,7 @@
 // This ensures the site looks complete even without DB connection
 
 export const fallbackSettings = {
-    accent_color: '#ef4444',
+    accent_color: '#ffbb00',
     background_color: '#161616',
     text_color: '#d7d7d7',
     hero_image_url: '/placeholders/hero-bg.jpg',

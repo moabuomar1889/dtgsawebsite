@@ -38,7 +38,7 @@ export default function AdminLoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+        <div className="admin-theme min-h-screen bg-bg flex items-center justify-center p-4">
             <div className="w-full max-w-md">
                 <div className="bg-card-bg border border-border rounded-lg p-8">
                     {/* Logo */}

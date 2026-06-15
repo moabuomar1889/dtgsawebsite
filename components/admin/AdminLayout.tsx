@@ -77,7 +77,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
 
     return (
-        <div className="h-screen bg-bg flex overflow-hidden">
+        <div className="admin-theme h-screen bg-bg flex overflow-hidden">
             {/* Sidebar - Fixed position */}
             <aside
                 className={`fixed left-0 top-0 h-full bg-card-bg border-r border-border z-50 ${sidebarOpen ? 'w-64' : 'w-20'}`}

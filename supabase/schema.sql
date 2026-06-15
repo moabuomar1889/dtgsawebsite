@@ -17,7 +17,7 @@ GRANT USAGE ON SCHEMA dtgsawebsite TO anon, authenticated;
 -- Create tables
 CREATE TABLE dtgsawebsite.settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    accent_color VARCHAR(20) DEFAULT '#ef4444',
+    accent_color VARCHAR(20) DEFAULT '#ffbb00',
     background_color VARCHAR(20) DEFAULT '#161616',
     text_color VARCHAR(20) DEFAULT '#d7d7d7',
     hero_image_url TEXT,

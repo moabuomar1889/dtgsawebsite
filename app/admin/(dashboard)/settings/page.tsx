@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '@/lib/actions';
 import ImageUpload from '@/components/admin/ImageUpload';
+import { DEFAULT_ACCENT_COLOR, normalizeHexColor } from '@/lib/theme-colors';
 
 export default function AdminSettingsPage() {
     const [loading, setLoading] = useState(true);
@@ -10,7 +11,7 @@ export default function AdminSettingsPage() {
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     // Form state
-    const [accentColor, setAccentColor] = useState('#ef4444');
+    const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR);
     const [siteTitle, setSiteTitle] = useState('');
     const [heroHeadline, setHeroHeadline] = useState('');
     const [heroSubheadline, setHeroSubheadline] = useState('');
@@ -27,7 +28,7 @@ export default function AdminSettingsPage() {
             if (!isMounted) return;
 
             if (data) {
-                setAccentColor(data.accent_color);
+                setAccentColor(normalizeHexColor(data.accent_color));
                 setSiteTitle(data.site_title);
                 setHeroHeadline(data.hero_headline);
                 setHeroSubheadline(data.hero_subheadline);
@@ -46,17 +47,14 @@ export default function AdminSettingsPage() {
         };
     }, []);
 
-    // Apply accent color to CSS variables immediately (optimistic update)
-    useEffect(() => {
-        document.documentElement.style.setProperty('--color-accent', accentColor);
-    }, [accentColor]);
-
     const handleSave = async () => {
         setSaving(true);
         setMessage(null);
+        const normalizedAccentColor = normalizeHexColor(accentColor);
+        setAccentColor(normalizedAccentColor);
 
         const result = await updateSettings({
-            accent_color: accentColor,
+            accent_color: normalizedAccentColor,
             site_title: siteTitle,
             hero_headline: heroHeadline,
             hero_subheadline: heroSubheadline,
@@ -83,6 +81,8 @@ export default function AdminSettingsPage() {
             </div>
         );
     }
+
+    const previewAccentColor = normalizeHexColor(accentColor);
 
     return (
         <div>
@@ -119,7 +119,7 @@ export default function AdminSettingsPage() {
                                 />
                             </div>
                             <p className="text-xs text-text-muted mt-2">
-                                Changes preview instantly. Click Save to persist.
+                                Controls the public website accent. Admin panel stays gold.
                             </p>
                         </div>
 
@@ -129,14 +129,14 @@ export default function AdminSettingsPage() {
                             <div className="flex items-center gap-4">
                                 <div
                                     className="w-8 h-8 rounded-full"
-                                    style={{ backgroundColor: accentColor }}
+                                    style={{ backgroundColor: previewAccentColor }}
                                 />
-                                <span className="font-bold" style={{ color: accentColor }}>
+                                <span className="font-bold" style={{ color: previewAccentColor }}>
                                     DURRAT.
                                 </span>
                                 <button
                                     className="px-4 py-2 text-white text-sm rounded"
-                                    style={{ backgroundColor: accentColor }}
+                                    style={{ backgroundColor: previewAccentColor }}
                                 >
                                     Button
                                 </button>

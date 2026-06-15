@@ -3,7 +3,7 @@
 /* Theme CSS Variables */
 @theme {
   /* Colors */
-  --color-accent: #ef4444;
+  --color-accent: #ffbb00;
   --color-bg: #161616;
   --color-text: #d7d7d7;
   --color-text-muted: #888888;
@@ -117,6 +117,15 @@
   a:hover {
     opacity: 0.8;
   }
+}
+
+.admin-theme {
+  --color-accent: #ffbb00;
+}
+
+.admin-theme ::selection {
+  background-color: #ffbb00;
+  color: #161616;
 }
 
 /* Utility classes */
