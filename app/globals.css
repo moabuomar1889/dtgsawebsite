@@ -828,8 +828,7 @@
 }
 
 /* =====================================================
-   Experience - Scroll-triggered 3-side border
-   TOP (R→L) → LEFT (T→B) → BOTTOM (L→R)
+   Experience - scroll-triggered 3-side border
    ===================================================== */
 
 .exp-border-card {
@@ -841,79 +840,29 @@
   inset: 0;
   pointer-events: none;
   z-index: 10;
+  overflow: visible;
 }
 
-/* Border lines - 1px accent color, ALL hidden by default */
-.exp-border span {
-  position: absolute;
-  background-color: var(--color-accent);
-  will-change: transform;
+.exp-border-path {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 1px;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+  transition: stroke-dashoffset 3.2s cubic-bezier(0.65, 0, 0.35, 1) 350ms;
+  will-change: stroke-dashoffset;
 }
 
-/* TOP line: draws RIGHT to LEFT - starts HIDDEN */
-.exp-border .exp-top {
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 1px;
-  transform: scaleX(0);
-  transform-origin: right center;
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0ms;
-}
-
-/* LEFT line: draws TOP to BOTTOM - starts HIDDEN */
-.exp-border .exp-left {
-  top: 0;
-  left: 0;
-  width: 1px;
-  height: 100%;
-  transform: scaleY(0);
-  transform-origin: center top;
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0ms;
-}
-
-/* BOTTOM line: draws LEFT to RIGHT - starts HIDDEN */
-.exp-border .exp-bottom {
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 1px;
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0ms;
-}
-
-/* When visible (scroll-triggered) - sequential animation */
-/* SLOW timing: 500ms each with 500ms delays for testing */
-.exp-border-card.is-visible .exp-top {
-  transform: scaleX(1);
-  transition-delay: 0ms;
-}
-
-.exp-border-card.is-visible .exp-left {
-  transform: scaleY(1);
-  transition-delay: 500ms;
-}
-
-.exp-border-card.is-visible .exp-bottom {
-  transform: scaleX(1);
-  transition-delay: 1000ms;
+.exp-border-card.is-visible .exp-border-path {
+  stroke-dashoffset: 0;
 }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .exp-border span {
+  .exp-border-path {
     transition: none;
-    transition-delay: 0ms;
-  }
-
-  .exp-border-card.is-visible .exp-top,
-  .exp-border-card.is-visible .exp-left,
-  .exp-border-card.is-visible .exp-bottom {
-    transform: scaleX(1);
-  }
-
-  .exp-border-card.is-visible .exp-left {
-    transform: scaleY(1);
+    stroke-dashoffset: 0;
   }
 }
