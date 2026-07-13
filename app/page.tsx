@@ -1,4 +1,4 @@
-import { getPublicSettings } from '@/lib/data-fetching';
+import { getPublicContentService } from '@/backend/config/public-content';
 import { normalizeHexColor } from '@/lib/theme-colors';
 import HomePageClient from './HomePageClient';
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   // Fetch settings server-side
-  const settings = await getPublicSettings();
+  const settings = await getPublicContentService().getSettings();
   const accentColor = normalizeHexColor(settings.accent_color);
 
   return (
