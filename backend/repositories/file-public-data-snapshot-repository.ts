@@ -3,6 +3,7 @@ import path from 'path';
 
 import type { PublicContent, PublicContentKey } from '@/backend/models/public-content';
 import type { PublicDataSnapshotRepository } from '@/backend/repositories/public-data-snapshot-repository';
+import { hasUsableData } from '@/backend/shared/has-usable-data';
 
 interface PublicDataSnapshot<Key extends PublicContentKey> {
     version: 1;
@@ -30,7 +31,7 @@ export class FilePublicDataSnapshotRepository implements PublicDataSnapshotRepos
                 return null;
             }
 
-            return this.hasUsableData(snapshot.data) ? snapshot.data : null;
+            return hasUsableData(snapshot.data) ? snapshot.data : null;
         } catch {
             return null;
         }
@@ -40,7 +41,7 @@ export class FilePublicDataSnapshotRepository implements PublicDataSnapshotRepos
         key: Key,
         data: PublicContent[Key]
     ): Promise<boolean> {
-        if (!this.hasUsableData(data)) {
+        if (!hasUsableData(data)) {
             return false;
         }
 
@@ -74,12 +75,5 @@ export class FilePublicDataSnapshotRepository implements PublicDataSnapshotRepos
             || path.join(process.cwd(), '.data', 'public-cache');
 
         return path.join(cacheRoot, `${key}.json`);
-    }
-
-    private hasUsableData<T>(data: T | null | undefined): data is T {
-        if (data == null) return false;
-        if (Array.isArray(data)) return data.length > 0;
-        if (typeof data === 'object') return Object.keys(data).length > 0;
-        return true;
     }
 }

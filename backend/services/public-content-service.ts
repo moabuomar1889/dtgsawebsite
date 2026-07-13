@@ -1,6 +1,7 @@
 import type { PublicContent, PublicContentKey } from '@/backend/models/public-content';
 import type { PublicContentRepository } from '@/backend/repositories/public-content-repository';
 import type { PublicDataSnapshotRepository } from '@/backend/repositories/public-data-snapshot-repository';
+import { hasUsableData } from '@/backend/shared/has-usable-data';
 
 export class PublicContentService {
     constructor(
@@ -66,7 +67,7 @@ export class PublicContentService {
         try {
             const data = await loader();
 
-            if (!this.hasUsableData(data)) {
+            if (!hasUsableData(data)) {
                 return this.readSnapshotOrFallback(key);
             }
 
@@ -83,12 +84,5 @@ export class PublicContentService {
     ): Promise<PublicContent[Key]> {
         const snapshot = await this.snapshotRepository.read(key);
         return snapshot ?? this.fallbackContent[key];
-    }
-
-    private hasUsableData<T>(data: T | null | undefined): data is T {
-        if (data == null) return false;
-        if (Array.isArray(data)) return data.length > 0;
-        if (typeof data === 'object') return Object.keys(data).length > 0;
-        return true;
     }
 }
