@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getPublicProjects } from '@/lib/data-fetching';
+import { getPublicContentService } from '@/backend/config/public-content';
 
 export async function GET() {
     try {
-        const projects = await getPublicProjects();
+        const projects = await getPublicContentService().getProjects();
         return NextResponse.json(projects);
     } catch (error) {
         console.error('Error fetching projects:', error);

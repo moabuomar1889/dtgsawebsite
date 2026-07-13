@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getPublicClients } from '@/lib/data-fetching';
+import { getPublicContentService } from '@/backend/config/public-content';
 
 export async function GET() {
     try {
-        const clients = await getPublicClients();
+        const clients = await getPublicContentService().getClients();
         return NextResponse.json(clients);
     } catch (error) {
         console.error('Error fetching clients:', error);
