@@ -4,9 +4,9 @@ A Gilber-style fullpage scroll website with Supabase CMS backend.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS v4, Framer Motion
+- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS v4, Framer Motion
 - **Backend**: Supabase (Auth, Database, Storage)
-- **Schema**: `dtgsa-website` (all tables in this schema)
+- **Database**: use `public` for the self-hosted private Supabase database. The legacy cloud schema name is supported only when `NEXT_PUBLIC_SUPABASE_DB_SCHEMA` is set.
 
 ## Setup
 
@@ -29,9 +29,13 @@ Create `.env.local` file:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_SITE_URL=https://www.example.com
+ADMIN_EMAILS=admin@example.com
 ```
 
 Find these values in Supabase Dashboard → Settings → API.
+
+`NEXT_PUBLIC_SITE_URL` is used for password reset links. `ADMIN_EMAILS` is a server-only comma-separated allowlist for admin access.
 
 ### 4. Run Database Schema
 
@@ -49,7 +53,7 @@ This creates:
 ### 5. Create Storage Bucket
 
 1. Go to Supabase Dashboard → Storage
-2. Create a new bucket called `public-assets`
+2. Create a new bucket called `dtgsa-website-assets`
 3. Make it public (for reading)
 
 ### 6. Create Admin User
@@ -57,7 +61,8 @@ This creates:
 1. Go to Supabase Dashboard → Authentication → Users
 2. Click "Add User"
 3. Enter email and password
-4. This user can now log into `/admin/login`
+4. Set `app_metadata.role` to `admin`, or add the email to `ADMIN_EMAILS`
+5. This user can now log into `/admin/login`
 
 ### 7. Run Development Server
 
@@ -86,12 +91,13 @@ Visit:
 
 - **RLS Enabled**: All tables have Row Level Security
 - **Public Read**: Published content readable by anyone
-- **Authenticated Write**: Only logged-in users can modify data
+- **Admin Write**: Only admin users can modify CMS data
+- **Storage Protection**: Public image reads are allowed, but upload/update/delete require admin
 - **No Service Role**: CMS uses user session for all operations
 
 ## Database Schema
 
-All tables are in the `dtgsa-website` schema:
+Self-hosted deployments should keep website tables in `public`:
 
 - `settings` - Site settings (single row)
 - `clients` - Client logos and info
@@ -110,7 +116,18 @@ All tables are in the `dtgsa-website` schema:
 3. Add environment variables:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SITE_URL`
+   - `ADMIN_EMAILS`
 4. Deploy
+
+### Supabase Auth Email
+
+Password reset emails are sent by Supabase Auth, not by the Next.js app. Configure SMTP in Supabase Auth:
+
+- `SITE_URL` should be the canonical public site URL.
+- Additional redirect URLs must include `/admin/reset-password`.
+- SMTP host, port, user, password, sender email, and sender name must point to a real email provider.
+- SPF, DKIM, and DMARC should be configured for the sender domain.
 
 ## Fallback Data
 

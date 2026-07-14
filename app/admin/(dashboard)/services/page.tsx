@@ -1,16 +1,23 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
+import type { ColumnDef } from '@tanstack/react-table';
 import { getServices, createService, updateService, deleteService } from '@/lib/actions';
 import type { Service } from '@/lib/supabase/types';
 import ImageUpload from '@/components/admin/ImageUpload';
-import Image from 'next/image';
+import AdminDataTable from '@/components/admin/AdminDataTable';
+import { normalizeAssetUrl } from '@/lib/asset-url';
 
 export default function AdminServicesPage() {
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
+    const [formError, setFormError] = useState<string | null>(null);
 
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -25,22 +32,17 @@ export default function AdminServicesPage() {
     };
 
     useEffect(() => {
-        let isMounted = true;
-
-        void getServices().then((data) => {
-            if (!isMounted) return;
-            setServices(data);
-            setLoading(false);
-        });
-
-        return () => {
-            isMounted = false;
-        };
+        void loadServices();
     }, []);
 
     const resetForm = () => {
-        setTitle(''); setDescription(''); setIconUrl(''); setSortOrder(services.length);
-        setEditingId(null); setShowForm(false);
+        setTitle('');
+        setDescription('');
+        setIconUrl('');
+        setSortOrder(services.length);
+        setEditingId(null);
+        setShowForm(false);
+        setFormError(null);
     };
 
     const handleEdit = (item: Service) => {
@@ -50,135 +52,248 @@ export default function AdminServicesPage() {
         setSortOrder(item.sort_order);
         setEditingId(item.id);
         setShowForm(true);
+        setFormError(null);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const data = {
+        setSaving(true);
+        setFormError(null);
+
+        const payload = {
             title,
             description,
-            icon_key: 'custom', // Using custom since we have image now
+            icon_key: iconUrl ? 'custom' : 'default',
             icon_url: iconUrl || null,
-            sort_order: sortOrder
+            sort_order: sortOrder,
         };
-        if (editingId) await updateService(editingId, data);
-        else await createService(data);
-        resetForm(); loadServices();
+
+        const result = editingId
+            ? await updateService(editingId, payload)
+            : await createService(payload);
+
+        setSaving(false);
+
+        if (!result.success) {
+            const message = result.error || 'Failed to save service';
+            setFormError(message);
+            toast.error(message);
+            return;
+        }
+
+        toast.success(editingId ? 'Service updated' : 'Service created');
+        resetForm();
+        await loadServices();
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm('Delete this service?')) { await deleteService(id); loadServices(); }
+        if (!confirm('Delete this service?')) return;
+
+        const result = await deleteService(id);
+        if (!result.success) {
+            toast.error(result.error || 'Failed to delete service');
+            return;
+        }
+
+        toast.success('Service deleted');
+        await loadServices();
     };
 
-    if (loading) return <div className="text-text-muted">Loading services...</div>;
+    const columns = useMemo<ColumnDef<Service>[]>(
+        () => [
+            {
+                accessorKey: 'sort_order',
+                header: 'Order',
+                cell: ({ row }) => <span className="text-text">{row.original.sort_order}</span>,
+                size: 90,
+            },
+            {
+                accessorKey: 'icon_url',
+                header: 'Icon',
+                enableSorting: false,
+                cell: ({ row }) => (
+                    row.original.icon_url ? (
+                        <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-bg">
+                            <Image
+                                src={normalizeAssetUrl(row.original.icon_url) || row.original.icon_url}
+                                alt={row.original.title}
+                                fill
+                                sizes="48px"
+                                className="object-contain"
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-bg text-xs text-text-muted">
+                            No icon
+                        </div>
+                    )
+                ),
+                size: 110,
+            },
+            {
+                accessorKey: 'title',
+                header: 'Title',
+                cell: ({ row }) => <span className="font-semibold text-text">{row.original.title}</span>,
+            },
+            {
+                accessorKey: 'description',
+                header: 'Description',
+                cell: ({ row }) => (
+                    <span className="line-clamp-1 text-sm text-text-muted">
+                        {row.original.description || '-'}
+                    </span>
+                ),
+            },
+            {
+                id: 'actions',
+                header: 'Actions',
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => handleEdit(row.original)}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
+                            aria-label={`Edit ${row.original.title}`}
+                        >
+                            <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleDelete(row.original.id)}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-red-500/10 hover:text-red-400"
+                            aria-label={`Delete ${row.original.title}`}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    </div>
+                ),
+                size: 120,
+            },
+        ],
+        [services]
+    );
+
+    if (loading) {
+        return <div className="text-text-muted">Loading services...</div>;
+    }
 
     return (
-        <div>
-            <div className="flex items-center justify-between mb-8">
-                <h1 className="text-3xl font-bold text-text">Services</h1>
-                <button onClick={() => { resetForm(); setShowForm(true); }} className="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90">+ Add Service</button>
+        <div className="space-y-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-text">Services</h1>
+                    <p className="mt-1 text-sm text-text-muted">Manage the service cards shown on the public site.</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        resetForm();
+                        setShowForm(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90"
+                >
+                    <Plus className="h-4 w-4" />
+                    Add Service
+                </button>
             </div>
 
             {showForm && (
-                <div className="bg-card-bg border border-border rounded-lg p-6 mb-8">
-                    <h2 className="text-xl font-bold text-text mb-4">{editingId ? 'Edit Service' : 'Add Service'}</h2>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="overflow-hidden rounded-lg border border-border bg-card-bg">
+                    <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                        <div>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+                                {editingId ? 'Service Editor' : 'New Service'}
+                            </p>
+                            <h2 className="text-xl font-bold text-text">{editingId ? title || 'Edit Service' : 'Add Service'}</h2>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={resetForm}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-bg hover:text-text"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    {formError && (
+                        <div className="mx-5 mt-5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                            {formError}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[180px_minmax(0,1fr)]">
                             <div>
-                                <label className="block text-sm font-medium text-text mb-2">Title *</label>
-                                <input
-                                    type="text"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    required
-                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Sort Order</label>
-                                <input
-                                    type="number"
-                                    value={sortOrder}
-                                    onChange={(e) => setSortOrder(Number(e.target.value))}
-                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent"
+                                <label className="mb-2 block text-sm font-medium text-text">Service Icon</label>
+                                <ImageUpload
+                                    currentUrl={iconUrl}
+                                    onUpload={setIconUrl}
+                                    folder="services"
+                                    aspectRatio="1/1"
+                                    label=""
+                                    recommendedDimensions="512x512px"
                                 />
                             </div>
 
-                            {/* Icon Upload */}
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Service Icon</label>
-                                <div className="w-[120px]">
-                                    <ImageUpload
-                                        currentUrl={iconUrl}
-                                        onUpload={setIconUrl}
-                                        folder="services"
-                                        aspectRatio="1/1"
-                                        label=""
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Title *</label>
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        required
+                                        className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={sortOrder}
+                                        onChange={(e) => setSortOrder(Number(e.target.value))}
+                                        className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="mb-2 block text-sm font-medium text-text">Description</label>
+                                    <textarea
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        rows={4}
+                                        className="w-full resize-none rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
                                     />
                                 </div>
                             </div>
-
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-text mb-2">Description</label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows={3}
-                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent resize-none"
-                                />
-                            </div>
                         </div>
-                        <div className="flex gap-4">
-                            <button type="submit" className="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90">{editingId ? 'Update' : 'Create'}</button>
-                            <button type="button" onClick={resetForm} className="px-6 py-2 border border-border text-text rounded-lg hover:border-accent">Cancel</button>
+
+                        <div className="flex flex-col-reverse gap-3 border-t border-border px-5 py-4 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                className="inline-flex justify-center rounded-lg border border-border px-5 py-3 text-sm font-medium text-text transition-colors hover:border-accent hover:text-accent"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <Save className="h-4 w-4" />
+                                {saving ? 'Saving...' : editingId ? 'Update Service' : 'Create Service'}
+                            </button>
                         </div>
                     </form>
                 </div>
             )}
 
-            <div className="bg-card-bg border border-border rounded-lg overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-bg border-b border-border">
-                        <tr>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Order</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Icon</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Title</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Description</th>
-                            <th className="text-right px-6 py-4 text-sm font-medium text-text-muted">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {services.map((item) => (
-                            <tr key={item.id} className="border-b border-border last:border-0 hover:bg-bg/50">
-                                <td className="px-6 py-4 text-text">{item.sort_order}</td>
-                                <td className="px-6 py-4">
-                                    {item.icon_url ? (
-                                        <div className="w-12 h-12 relative rounded-lg overflow-hidden bg-bg">
-                                            <Image
-                                                src={item.icon_url}
-                                                alt={item.title}
-                                                fill
-                                                className="object-contain"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className="w-12 h-12 rounded-lg bg-bg flex items-center justify-center text-text-muted text-xs">
-                                            No icon
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="px-6 py-4 text-text font-medium">{item.title}</td>
-                                <td className="px-6 py-4 text-text-muted text-sm line-clamp-1">{item.description || '-'}</td>
-                                <td className="px-6 py-4 text-right">
-                                    <button onClick={() => handleEdit(item)} className="text-accent hover:underline mr-4">Edit</button>
-                                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:underline">Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {services.length === 0 && <div className="text-center py-8 text-text-muted">No services yet.</div>}
-            </div>
+            <AdminDataTable
+                data={services}
+                columns={columns}
+                emptyMessage="No services yet."
+            />
         </div>
     );
 }

@@ -926,3 +926,32 @@
     transform: scaleY(1);
   }
 }
+
+/* Admin media uploader */
+.admin-theme .filepond--root {
+  margin-bottom: 0;
+  font-family: inherit;
+}
+
+.admin-theme .filepond--panel-root {
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--color-border);
+}
+
+.admin-theme .filepond--drop-label {
+  color: var(--color-text-muted);
+  min-height: 100%;
+}
+
+.admin-theme .filepond--label-action {
+  color: var(--color-accent);
+  text-decoration-color: var(--color-accent);
+}
+
+.admin-theme .filepond--item-panel {
+  background-color: var(--color-accent);
+}
+
+.admin-theme .filepond--credits {
+  display: none;
+}

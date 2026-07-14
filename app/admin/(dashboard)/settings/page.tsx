@@ -1,14 +1,60 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '@/lib/actions';
 import ImageUpload from '@/components/admin/ImageUpload';
 import { DEFAULT_ACCENT_COLOR, normalizeHexColor } from '@/lib/theme-colors';
+import { createClient } from '@/lib/supabase/client';
+import { Eye, EyeOff } from 'lucide-react';
+
+const MIN_PASSWORD_LENGTH = 8;
+
+function PasswordInput({
+    id,
+    value,
+    onChange,
+    autoComplete,
+    minLength,
+}: {
+    id: string;
+    value: string;
+    onChange: (value: string) => void;
+    autoComplete: string;
+    minLength?: number;
+}) {
+    const [visible, setVisible] = useState(false);
+
+    return (
+        <div className="relative">
+            <input
+                id={id}
+                type={visible ? 'text' : 'password'}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                required
+                minLength={minLength}
+                autoComplete={autoComplete}
+                className="w-full rounded-lg border border-border bg-bg px-4 py-3 pr-12 text-text focus:border-accent focus:outline-none"
+            />
+            <button
+                type="button"
+                onClick={() => setVisible((current) => !current)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 text-text-muted transition-colors hover:text-text"
+                aria-label={visible ? 'Hide password' : 'Show password'}
+            >
+                {visible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+        </div>
+    );
+}
 
 export default function AdminSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [passwordSaving, setPasswordSaving] = useState(false);
+    const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const supabase = useMemo(() => createClient(), []);
 
     // Form state
     const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR);
@@ -20,6 +66,9 @@ export default function AdminSettingsPage() {
     const [contactAddress, setContactAddress] = useState('');
     const [heroImageUrl, setHeroImageUrl] = useState('');
     const [aboutImageUrl, setAboutImageUrl] = useState('');
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
     useEffect(() => {
         let isMounted = true;
@@ -72,6 +121,66 @@ export default function AdminSettingsPage() {
         }
 
         setSaving(false);
+    };
+
+    const handlePasswordChange = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordMessage(null);
+
+        if (newPassword !== confirmNewPassword) {
+            setPasswordMessage({ type: 'error', text: 'New passwords do not match' });
+            return;
+        }
+
+        if (newPassword.length < MIN_PASSWORD_LENGTH) {
+            setPasswordMessage({
+                type: 'error',
+                text: `New password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+            });
+            return;
+        }
+
+        setPasswordSaving(true);
+
+        try {
+            const {
+                data: { user },
+                error: userError,
+            } = await supabase.auth.getUser();
+
+            if (userError || !user?.email) {
+                setPasswordMessage({ type: 'error', text: 'Could not verify the current admin session' });
+                return;
+            }
+
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: currentPassword,
+            });
+
+            if (signInError) {
+                setPasswordMessage({ type: 'error', text: 'Current password is incorrect' });
+                return;
+            }
+
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: newPassword,
+            });
+
+            if (updateError) {
+                setPasswordMessage({ type: 'error', text: updateError.message });
+                return;
+            }
+
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmNewPassword('');
+            setPasswordMessage({ type: 'success', text: 'Password updated successfully' });
+        } catch {
+            setPasswordMessage({ type: 'error', text: 'An unexpected error occurred' });
+        } finally {
+            setPasswordSaving(false);
+        }
     };
 
     if (loading) {
@@ -267,6 +376,73 @@ export default function AdminSettingsPage() {
                             />
                         </div>
                     </div>
+                </div>
+
+                {/* Account Security */}
+                <div className="bg-card-bg border border-border rounded-lg p-6 lg:col-span-2">
+                    <h2 className="text-xl font-bold text-text mb-2">Account Security</h2>
+                    <p className="text-sm text-text-muted mb-6">
+                        Change the current admin password. You will need the existing password to confirm this action.
+                    </p>
+
+                    {passwordMessage && (
+                        <div
+                            className={`p-4 rounded-lg mb-6 ${passwordMessage.type === 'success' ? 'bg-green-500/10 border border-green-500/30 text-green-400' : 'bg-red-500/10 border border-red-500/30 text-red-400'}`}
+                            role={passwordMessage.type === 'success' ? 'status' : 'alert'}
+                        >
+                            {passwordMessage.text}
+                        </div>
+                    )}
+
+                    <form onSubmit={handlePasswordChange} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label htmlFor="current-password" className="block text-sm font-medium text-text mb-2">
+                                Current Password
+                            </label>
+                            <PasswordInput
+                                id="current-password"
+                                value={currentPassword}
+                                onChange={setCurrentPassword}
+                                autoComplete="current-password"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="new-password" className="block text-sm font-medium text-text mb-2">
+                                New Password
+                            </label>
+                            <PasswordInput
+                                id="new-password"
+                                value={newPassword}
+                                onChange={setNewPassword}
+                                minLength={MIN_PASSWORD_LENGTH}
+                                autoComplete="new-password"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="confirm-new-password" className="block text-sm font-medium text-text mb-2">
+                                Confirm New Password
+                            </label>
+                            <PasswordInput
+                                id="confirm-new-password"
+                                value={confirmNewPassword}
+                                onChange={setConfirmNewPassword}
+                                minLength={MIN_PASSWORD_LENGTH}
+                                autoComplete="new-password"
+                            />
+                        </div>
+
+                        <div className="md:col-span-3 flex justify-end">
+                            <button
+                                type="submit"
+                                disabled={passwordSaving}
+                                className="px-6 py-3 bg-accent text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {passwordSaving ? 'Updating...' : 'Update Password'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

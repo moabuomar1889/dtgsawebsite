@@ -1,74 +1,73 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import {
+    BriefcaseBusiness,
+    Building2,
+    ChevronsLeft,
+    ChevronsRight,
+    ExternalLink,
+    ImageIcon,
+    Images,
+    LayoutDashboard,
+    LogOut,
+    Mail,
+    Newspaper,
+    Settings,
+    Wrench,
+    type LucideIcon,
+} from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface AdminLayoutProps {
     children: React.ReactNode;
 }
 
-const navItems = [
-    { href: '/admin', label: 'Dashboard', icon: 'dashboard' },
-    { href: '/admin/settings', label: 'Settings', icon: 'settings' },
-    { href: '/admin/clients', label: 'Clients', icon: 'clients' },
-    { href: '/admin/projects', label: 'Projects', icon: 'projects' },
-    { href: '/admin/news', label: 'News', icon: 'news' },
-    { href: '/admin/experience', label: 'Experience', icon: 'experience' },
-    { href: '/admin/services', label: 'Services', icon: 'services' },
-    { href: '/admin/messages', label: 'Messages', icon: 'messages' },
+interface NavItem {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+}
+
+const navGroups: Array<{ label: string; items: NavItem[] }> = [
+    {
+        label: 'Workspace',
+        items: [
+            { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+            { href: '/admin/settings', label: 'Settings', icon: Settings },
+        ],
+    },
+    {
+        label: 'Content',
+        items: [
+            { href: '/admin/projects', label: 'Projects', icon: ImageIcon },
+            { href: '/admin/media', label: 'Media', icon: Images },
+            { href: '/admin/clients', label: 'Clients', icon: Building2 },
+            { href: '/admin/services', label: 'Services', icon: Wrench },
+            { href: '/admin/experience', label: 'Experience', icon: BriefcaseBusiness },
+            { href: '/admin/news', label: 'News', icon: Newspaper },
+            { href: '/admin/messages', label: 'Messages', icon: Mail },
+        ],
+    },
 ];
 
-const icons: Record<string, React.ReactNode> = {
-    dashboard: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-        </svg>
-    ),
-    settings: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-    ),
-    clients: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-    ),
-    projects: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-    ),
-    news: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-        </svg>
-    ),
-    experience: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-    ),
-    services: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        </svg>
-    ),
-    messages: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-    ),
-};
+const navItems = navGroups.flatMap((group) => group.items);
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    const activeItem = navItems.find((item) => {
+        if (item.href === '/admin') {
+            return pathname === item.href;
+        }
+
+        return pathname === item.href || pathname.startsWith(`${item.href}/`);
+    }) || navItems[0];
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -77,82 +76,110 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     };
 
     return (
-        <div className="admin-theme h-screen bg-bg flex overflow-hidden">
-            {/* Sidebar - Fixed position */}
+        <div className="admin-theme flex h-screen overflow-hidden bg-bg text-text">
             <aside
-                className={`fixed left-0 top-0 h-full bg-card-bg border-r border-border z-50 ${sidebarOpen ? 'w-64' : 'w-20'}`}
+                className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-border bg-card-bg transition-[width] duration-200 ${sidebarOpen ? 'w-64' : 'w-20'}`}
             >
-                {/* Logo */}
-                <div className="p-6 border-b border-border">
-                    <Link href="/admin" className="flex flex-col leading-tight">
-                        <div className={`font-bold text-accent tracking-wide ${sidebarOpen ? 'text-xl' : 'text-lg text-center'}`}>
+                <div className="flex h-20 items-center border-b border-border px-5">
+                    <Link href="/admin" className="min-w-0 leading-tight">
+                        <div className={`font-bold tracking-wide text-accent ${sidebarOpen ? 'text-xl' : 'text-center text-lg'}`}>
                             {sidebarOpen ? 'DURRAT.' : 'D.'}
                         </div>
                         {sidebarOpen && (
-                            <div className="text-[9px] tracking-[0.15em] text-accent/80 font-medium">
-                                ADMIN PANEL
+                            <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-accent/80">
+                                Admin Panel
                             </div>
                         )}
                     </Link>
                 </div>
 
-                {/* Navigation */}
-                <nav className="p-4 space-y-1">
-                    {navItems.map((item) => {
-                        const isActive = pathname === item.href;
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-lg ${isActive
-                                    ? 'bg-accent/10 text-accent'
-                                    : 'text-text-muted hover:text-text hover:bg-border/30'
-                                    }`}
-                            >
-                                {icons[item.icon]}
-                                {sidebarOpen && <span className="font-medium">{item.label}</span>}
-                            </Link>
-                        );
-                    })}
+                <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+                    {navGroups.map((group) => (
+                        <div key={group.label}>
+                            {sidebarOpen && (
+                                <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+                                    {group.label}
+                                </p>
+                            )}
+                            <div className="space-y-1">
+                                {group.items.map((item) => {
+                                    const Icon = item.icon;
+                                    const isActive = activeItem.href === item.href;
+
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors ${isActive
+                                                ? 'bg-accent/10 text-accent'
+                                                : 'text-text-muted hover:bg-border/35 hover:text-text'
+                                                } ${sidebarOpen ? 'justify-start' : 'justify-center'}`}
+                                            aria-current={isActive ? 'page' : undefined}
+                                            title={!sidebarOpen ? item.label : undefined}
+                                        >
+                                            <Icon className="h-5 w-5 shrink-0" />
+                                            {sidebarOpen && <span className="truncate">{item.label}</span>}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </nav>
 
-                {/* Bottom section */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border">
+                <div className="border-t border-border p-3">
                     <button
-                        onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-text-muted hover:text-text mb-2"
+                        type="button"
+                        onClick={() => setSidebarOpen((value) => !value)}
+                        className={`mb-2 flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-text-muted transition-colors hover:bg-border/35 hover:text-text ${sidebarOpen ? 'justify-start' : 'justify-center'}`}
+                        title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
                     >
-                        <svg className={`w-5 h-5 ${sidebarOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                        </svg>
+                        {sidebarOpen ? <ChevronsLeft className="h-5 w-5" /> : <ChevronsRight className="h-5 w-5" />}
                         {sidebarOpen && <span>Collapse</span>}
                     </button>
                     <button
+                        type="button"
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-400 hover:bg-red-500/10 rounded-lg"
+                        className={`mb-2 flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-red-300 transition-colors hover:bg-red-500/10 ${sidebarOpen ? 'justify-start' : 'justify-center'}`}
+                        title="Logout"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
+                        <LogOut className="h-5 w-5" />
                         {sidebarOpen && <span>Logout</span>}
                     </button>
                     <Link
                         href="/"
                         target="_blank"
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-text-muted hover:text-text mt-2"
+                        className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-text-muted transition-colors hover:bg-border/35 hover:text-text ${sidebarOpen ? 'justify-start' : 'justify-center'}`}
+                        title="View site"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
+                        <ExternalLink className="h-5 w-5" />
                         {sidebarOpen && <span>View Site</span>}
                     </Link>
                 </div>
             </aside>
 
-            {/* Main Content - ONLY scrollable container */}
-            <main className={`flex-1 h-full min-h-0 overflow-y-auto overscroll-contain ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
-                <div className="p-8">
-                    {children}
+            <main className={`flex h-full min-h-0 flex-1 flex-col overflow-hidden transition-[margin] duration-200 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
+                <header className="flex h-20 shrink-0 items-center justify-between border-b border-border bg-bg/95 px-6">
+                    <div className="min-w-0">
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent">Admin</p>
+                        <h1 className="truncate text-xl font-bold text-text">{activeItem.label}</h1>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/"
+                            target="_blank"
+                            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            View Site
+                        </Link>
+                    </div>
+                </header>
+
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <div className="px-5 py-6 lg:px-8">
+                        {children}
+                    </div>
                 </div>
             </main>
         </div>

@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
+import { ImagePlus, SlidersHorizontal, UploadCloud, X } from 'lucide-react';
+import { FilePond } from 'react-filepond';
+import { toast } from 'sonner';
 import { uploadImage } from '@/lib/storage';
+import PhotoEditor from './PhotoEditor';
+import { normalizeAssetUrl } from '@/lib/asset-url';
 import {
     formatBytes,
     MAX_UPLOAD_INPUT_SIZE,
@@ -108,39 +113,42 @@ export default function ImageUpload({
     compact = false,
 }: ImageUploadProps) {
     const [uploading, setUploading] = useState(false);
-    const [preview, setPreview] = useState<string | null>(currentUrl || null);
+    const [preview, setPreview] = useState<string | null>(normalizeAssetUrl(currentUrl));
     const [error, setError] = useState<string | null>(null);
     const [optimizationInfo, setOptimizationInfo] = useState<string | null>(null);
+    const [dragOver, setDragOver] = useState(false);
+    const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const pondRef = useRef<{ removeFiles: () => void } | null>(null);
 
     useEffect(() => {
-        setPreview(currentUrl || null);
+        setPreview(normalizeAssetUrl(currentUrl));
     }, [currentUrl]);
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const processImageFile = async (file: File) => {
         setError(null);
         setOptimizationInfo(null);
 
         if (!file.type.startsWith('image/')) {
-            setError('Please select an image file');
+            const message = 'Please select an image file';
+            setError(message);
+            toast.error(message);
             return;
         }
 
         if (file.size > MAX_UPLOAD_INPUT_SIZE) {
-            setError(`Image must be less than ${formatBytes(MAX_UPLOAD_INPUT_SIZE)} before optimization`);
+            const message = `Image must be less than ${formatBytes(MAX_UPLOAD_INPUT_SIZE)} before optimization`;
+            setError(message);
+            toast.error(message);
             return;
         }
 
         if (minWidth || minHeight || maxWidth || maxHeight) {
             const validation = await validateImageDimensions(file, minWidth, minHeight, maxWidth, maxHeight);
             if (!validation.valid) {
-                setError(validation.error || 'Image dimensions are invalid');
-                if (inputRef.current) {
-                    inputRef.current.value = '';
-                }
+                const message = validation.error || 'Image dimensions are invalid';
+                setError(message);
+                toast.error(message);
                 return;
             }
         }
@@ -173,18 +181,57 @@ export default function ImageUpload({
             if (result.success && result.url) {
                 onUpload(result.url);
                 setPreview(result.url);
+                toast.success('Image uploaded');
             } else {
                 throw new Error(result.error || 'Upload failed');
             }
         } catch (uploadError) {
-            setError(uploadError instanceof Error ? uploadError.message : 'Upload failed');
-            setPreview(currentUrl || null);
+            const message = uploadError instanceof Error ? uploadError.message : 'Upload failed';
+            setError(message);
+            toast.error(message);
+            setPreview(normalizeAssetUrl(currentUrl));
         } finally {
             setUploading(false);
-            if (inputRef.current) {
-                inputRef.current.value = '';
-            }
         }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        await processImageFile(file);
+
+        if (inputRef.current) {
+            inputRef.current.value = '';
+        }
+    };
+
+    const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        setDragOver(false);
+
+        const file = event.dataTransfer.files?.[0];
+        if (file) {
+            await processImageFile(file);
+        }
+    };
+
+    const handlePondAddFile = async (
+        fileError: unknown,
+        fileItem: { file: File | Blob; filename?: string }
+    ) => {
+        if (fileError) {
+            setError('Could not add this image');
+            toast.error('Could not add this image');
+            return;
+        }
+
+        const file = fileItem.file instanceof File
+            ? fileItem.file
+            : new File([fileItem.file], fileItem.filename || 'image-upload', { type: fileItem.file.type });
+
+        await processImageFile(file);
+        pondRef.current?.removeFiles();
     };
 
     const handleRemove = () => {
@@ -194,6 +241,22 @@ export default function ImageUpload({
         if (inputRef.current) {
             inputRef.current.value = '';
         }
+    };
+
+    const handleEditedImageSave = async (editedBlob: Blob) => {
+        const formData = new FormData();
+        formData.append('file', new File([editedBlob], `edited-image-${Date.now()}.webp`, { type: 'image/webp' }));
+        formData.append('folder', folder);
+
+        const result = await uploadImage(formData);
+        if (!result.success || !result.url) {
+            throw new Error(result.error || 'Failed to save edited image');
+        }
+
+        onUpload(result.url);
+        setPreview(result.url);
+        setOptimizationInfo('Edited image saved');
+        toast.success('Edited image saved');
     };
 
     const getDimensionText = () => {
@@ -215,9 +278,23 @@ export default function ImageUpload({
             )}
 
             <div
-                className={`relative border-2 border-dashed border-border rounded-lg overflow-hidden hover:border-accent transition-colors cursor-pointer ${compact ? 'w-full h-full' : ''}`}
+                className={`relative overflow-hidden rounded-lg border-2 border-dashed transition-colors ${preview ? 'cursor-pointer' : ''} ${dragOver ? 'border-accent bg-accent/5' : 'border-border hover:border-accent'} ${compact ? 'w-full h-full' : ''}`}
                 style={compact ? undefined : { aspectRatio }}
-                onClick={() => inputRef.current?.click()}
+                onClick={() => {
+                    if (preview) {
+                        inputRef.current?.click();
+                    }
+                }}
+                onDragEnter={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                }}
+                onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
             >
                 {preview ? (
                     <>
@@ -232,10 +309,22 @@ export default function ImageUpload({
                                 type="button"
                                 onClick={(event) => {
                                     event.stopPropagation();
+                                    setEditingImageUrl(preview);
+                                }}
+                                className={`${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} inline-flex items-center gap-2 rounded-lg bg-bg/90 font-medium text-text`}
+                            >
+                                <SlidersHorizontal className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
+                                Edit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(event) => {
+                                    event.stopPropagation();
                                     inputRef.current?.click();
                                 }}
-                                className={`${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} bg-accent text-white rounded-lg`}
+                                className={`${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} inline-flex items-center gap-2 rounded-lg bg-accent font-medium text-bg`}
                             >
+                                <ImagePlus className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
                                 Replace
                             </button>
                             <button
@@ -244,8 +333,9 @@ export default function ImageUpload({
                                     event.stopPropagation();
                                     handleRemove();
                                 }}
-                                className={`${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} bg-red-500 text-white rounded-lg`}
+                                className={`${compact ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} inline-flex items-center gap-2 rounded-lg bg-red-500 font-medium text-white`}
                             >
+                                <X className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
                                 Remove
                             </button>
                         </div>
@@ -255,16 +345,25 @@ export default function ImageUpload({
                         {uploading ? (
                             <div className={`animate-pulse ${compact ? 'text-xs' : ''}`}>Uploading...</div>
                         ) : (
-                            <>
-                                <svg className={`${compact ? 'w-6 h-6' : 'w-12 h-12'} mb-2`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                {!compact && <span className="text-sm">Click to upload</span>}
-                                {!compact && <span className="text-xs mt-1">Max {formatBytes(MAX_UPLOAD_INPUT_SIZE)}, optimized before upload</span>}
-                                {!compact && dimensionText && (
-                                    <span className="text-xs mt-1 text-accent">{dimensionText}</span>
-                                )}
-                            </>
+                            <div className="w-full px-4">
+                                <div className="mb-3 flex flex-col items-center text-center">
+                                    <UploadCloud className={`${compact ? 'mb-2 h-6 w-6' : 'mb-2 h-10 w-10'}`} />
+                                    {!compact && <span className="text-sm">Upload or drop image</span>}
+                                    {!compact && <span className="text-xs mt-1">Max {formatBytes(MAX_UPLOAD_INPUT_SIZE)}, optimized before upload</span>}
+                                    {!compact && dimensionText && (
+                                        <span className="text-xs mt-1 text-accent">{dimensionText}</span>
+                                    )}
+                                </div>
+                                <FilePond
+                                    ref={pondRef as never}
+                                    allowMultiple={false}
+                                    maxFiles={1}
+                                    allowProcess={false}
+                                    disabled={uploading}
+                                    labelIdle={compact ? 'Drop image' : 'Drop image or <span class="filepond--label-action">browse</span>'}
+                                    onaddfile={handlePondAddFile}
+                                />
+                            </div>
                         )}
                     </div>
                 )}
@@ -289,6 +388,16 @@ export default function ImageUpload({
                 onChange={handleFileChange}
                 className="hidden"
             />
+
+            {editingImageUrl && (
+                <PhotoEditor
+                    imageUrl={editingImageUrl}
+                    onSave={handleEditedImageSave}
+                    onCancel={() => setEditingImageUrl(null)}
+                    maxExportDimension={folder.toLowerCase().includes('settings') ? 1920 : folder.toLowerCase().includes('clients') ? 900 : 1600}
+                    exportQuality={folder.toLowerCase().includes('clients') ? 0.86 : 0.82}
+                />
+            )}
         </div>
     );
 }

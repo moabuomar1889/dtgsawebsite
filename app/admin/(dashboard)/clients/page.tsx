@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { ExternalLink, ImageIcon, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
+import type { ColumnDef } from '@tanstack/react-table';
 import { getClients, addClient, updateClient, deleteClient } from '@/lib/actions';
 import ImageUpload from '@/components/admin/ImageUpload';
 import PhotoEditor from '@/components/admin/PhotoEditor';
 import { uploadImage } from '@/lib/storage';
+import { normalizeAssetUrl } from '@/lib/asset-url';
 import type { Client } from '@/lib/supabase/types';
-import Image from 'next/image';
+import AdminDataTable from '@/components/admin/AdminDataTable';
 
 export default function AdminClientsPage() {
     const [clients, setClients] = useState<Client[]>([]);
@@ -16,20 +21,14 @@ export default function AdminClientsPage() {
     const [showForm, setShowForm] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
-    // Photo Editor state
     const [editingLogoUrl, setEditingLogoUrl] = useState<string | null>(null);
     const [editingClientId, setEditingClientId] = useState<string | null>(null);
 
-    // Form state
     const [name, setName] = useState('');
     const [websiteUrl, setWebsiteUrl] = useState('');
     const [logoUrl, setLogoUrl] = useState('');
     const [sortOrder, setSortOrder] = useState(0);
     const [isActive, setIsActive] = useState(true);
-
-    useEffect(() => {
-        loadClients();
-    }, []);
 
     const loadClients = async () => {
         setLoading(true);
@@ -37,6 +36,10 @@ export default function AdminClientsPage() {
         setClients(data);
         setLoading(false);
     };
+
+    useEffect(() => {
+        void loadClients();
+    }, []);
 
     const resetForm = () => {
         setName('');
@@ -65,269 +68,325 @@ export default function AdminClientsPage() {
         setFormError(null);
         setSaving(true);
 
-        try {
-            if (editingId) {
-                const result = await updateClient(editingId, {
-                    name,
-                    website_url: websiteUrl || null,
-                    logo_url_bw: logoUrl || null,
-                    sort_order: sortOrder,
-                    is_active: isActive
-                });
-                if (!result.success) {
-                    setFormError(result.error || 'Failed to update client');
-                    setSaving(false);
-                    return;
-                }
-            } else {
-                const result = await addClient({
-                    name,
-                    website_url: websiteUrl || null,
-                    logo_url_bw: logoUrl || null,
-                    sort_order: sortOrder,
-                    is_active: isActive
-                });
-                if (!result.success) {
-                    setFormError(result.error || 'Failed to add client');
-                    setSaving(false);
-                    return;
-                }
-            }
+        const payload = {
+            name,
+            website_url: websiteUrl || null,
+            logo_url_bw: logoUrl || null,
+            sort_order: sortOrder,
+            is_active: isActive,
+        };
 
-            resetForm();
-            await loadClients();
-        } catch (err) {
-            console.error('Submit error:', err);
-            setFormError(err instanceof Error ? err.message : 'An error occurred');
-        }
+        const result = editingId
+            ? await updateClient(editingId, payload)
+            : await addClient(payload);
 
         setSaving(false);
+
+        if (!result.success) {
+            const message = result.error || 'Failed to save client';
+            setFormError(message);
+            toast.error(message);
+            return;
+        }
+
+        toast.success(editingId ? 'Client updated' : 'Client created');
+        resetForm();
+        await loadClients();
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm('Are you sure you want to delete this client?')) {
-            await deleteClient(id);
-            loadClients();
+        if (!confirm('Are you sure you want to delete this client?')) return;
+
+        const result = await deleteClient(id);
+        if (!result.success) {
+            toast.error(result.error || 'Failed to delete client');
+            return;
         }
+
+        toast.success('Client deleted');
+        await loadClients();
     };
 
-    // Open photo editor for a client logo
     const openLogoEditor = (client: Client) => {
-        if (client.logo_url_bw) {
-            setEditingLogoUrl(client.logo_url_bw);
-            setEditingClientId(client.id);
-        }
+        if (!client.logo_url_bw) return;
+
+        setEditingLogoUrl(client.logo_url_bw);
+        setEditingClientId(client.id);
     };
 
-    // Handle save from photo editor
     const handleEditorSave = async (editedBlob: Blob) => {
-        if (!editingClientId) return;
-
-        try {
-            // Create FormData for upload
-            const formData = new FormData();
-            formData.append('file', new File([editedBlob], `client-logo-${Date.now()}.webp`, { type: 'image/webp' }));
-            formData.append('folder', 'clients');
-
-            // Upload the edited image
-            const result = await uploadImage(formData);
-
-            if (!result.success || !result.url) {
-                throw new Error(result.error || 'Upload failed');
-            }
-
-            // Update the client
-            await updateClient(editingClientId, {
-                logo_url_bw: result.url
-            });
-
-            // Refresh clients list
-            await loadClients();
-
-            // Close editor
-            setEditingLogoUrl(null);
-            setEditingClientId(null);
-        } catch (error) {
-            console.error('Error saving edited logo:', error);
-            alert('Failed to save edited logo');
+        if (!editingClientId) {
+            throw new Error('No client selected for editing');
         }
+
+        const formData = new FormData();
+        formData.append('file', new File([editedBlob], `client-logo-${Date.now()}.webp`, { type: 'image/webp' }));
+        formData.append('folder', 'clients');
+
+        const uploadResult = await uploadImage(formData);
+        if (!uploadResult.success || !uploadResult.url) {
+            throw new Error(uploadResult.error || 'Upload failed');
+        }
+
+        const updateResult = await updateClient(editingClientId, {
+            logo_url_bw: uploadResult.url,
+        });
+
+        if (!updateResult.success) {
+            throw new Error(updateResult.error || 'Failed to update client logo');
+        }
+
+        await loadClients();
     };
+
+    const closeLogoEditor = () => {
+        setEditingLogoUrl(null);
+        setEditingClientId(null);
+    };
+
+    const columns = useMemo<ColumnDef<Client>[]>(
+        () => [
+            {
+                accessorKey: 'sort_order',
+                header: 'Order',
+                cell: ({ row }) => <span className="text-text">{row.original.sort_order}</span>,
+                size: 90,
+            },
+            {
+                accessorKey: 'logo_url_bw',
+                header: 'Logo',
+                enableSorting: false,
+                cell: ({ row }) => (
+                    row.original.logo_url_bw ? (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white p-1">
+                            <Image
+                                src={normalizeAssetUrl(row.original.logo_url_bw) || row.original.logo_url_bw}
+                                alt={row.original.name}
+                                width={44}
+                                height={44}
+                                sizes="44px"
+                                quality={60}
+                                className="max-h-full max-w-full object-contain"
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-bg text-xs text-text-muted">
+                            No logo
+                        </div>
+                    )
+                ),
+                size: 110,
+            },
+            {
+                accessorKey: 'name',
+                header: 'Name',
+                cell: ({ row }) => <span className="font-semibold text-text">{row.original.name}</span>,
+            },
+            {
+                accessorKey: 'website_url',
+                header: 'Website',
+                cell: ({ row }) => (
+                    row.original.website_url ? (
+                        <a
+                            href={row.original.website_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex max-w-[260px] items-center gap-2 truncate text-sm text-accent hover:underline"
+                        >
+                            <span className="truncate">{row.original.website_url}</span>
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        </a>
+                    ) : (
+                        <span className="text-text-muted">-</span>
+                    )
+                ),
+            },
+            {
+                accessorKey: 'is_active',
+                header: 'Status',
+                cell: ({ row }) => (
+                    <span className={`rounded px-2 py-1 text-xs ${row.original.is_active ? 'bg-green-500/15 text-green-400' : 'bg-gray-500/15 text-gray-400'}`}>
+                        {row.original.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                ),
+                size: 110,
+            },
+            {
+                id: 'actions',
+                header: 'Actions',
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="flex justify-end gap-2">
+                        {row.original.logo_url_bw && (
+                            <button
+                                type="button"
+                                onClick={() => openLogoEditor(row.original)}
+                                className="rounded-md p-2 text-text-muted transition-colors hover:bg-blue-500/10 hover:text-blue-400"
+                                aria-label={`Edit logo for ${row.original.name}`}
+                            >
+                                <ImageIcon className="h-4 w-4" />
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => handleEdit(row.original)}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
+                            aria-label={`Edit ${row.original.name}`}
+                        >
+                            <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleDelete(row.original.id)}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-red-500/10 hover:text-red-400"
+                            aria-label={`Delete ${row.original.name}`}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    </div>
+                ),
+                size: 150,
+            },
+        ],
+        [clients]
+    );
 
     if (loading) {
         return <div className="text-text-muted">Loading clients...</div>;
     }
 
     return (
-        <div>
-            <div className="flex items-center justify-between mb-8">
-                <h1 className="text-3xl font-bold text-text">Clients</h1>
+        <div className="space-y-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-text">Clients</h1>
+                    <p className="mt-1 text-sm text-text-muted">Manage client logos, links, ordering, and visibility.</p>
+                </div>
                 <button
-                    onClick={() => { resetForm(); setShowForm(true); }}
-                    className="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+                    type="button"
+                    onClick={() => {
+                        resetForm();
+                        setShowForm(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90"
                 >
-                    + Add Client
+                    <Plus className="h-4 w-4" />
+                    Add Client
                 </button>
             </div>
 
-            {/* Form */}
             {showForm && (
-                <div className="bg-card-bg border border-border rounded-lg p-6 mb-8">
-                    <h2 className="text-xl font-bold text-text mb-4">
-                        {editingId ? 'Edit Client' : 'Add New Client'}
-                    </h2>
+                <div className="overflow-hidden rounded-lg border border-border bg-card-bg">
+                    <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                        <div>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+                                {editingId ? 'Client Editor' : 'New Client'}
+                            </p>
+                            <h2 className="text-xl font-bold text-text">{editingId ? name || 'Edit Client' : 'Add Client'}</h2>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={resetForm}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-bg hover:text-text"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
 
                     {formError && (
-                        <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-400">
-                            Error: {formError}
+                        <div className="mx-5 mt-5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                            {formError}
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Logo Upload */}
-                            <div className="md:row-span-2">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-text">Client Logo</label>
                                 <ImageUpload
                                     currentUrl={logoUrl}
                                     onUpload={setLogoUrl}
                                     folder="clients"
-                                    label="Client Logo"
+                                    label=""
                                     aspectRatio="1/1"
-                                    recommendedDimensions="Any size"
+                                    recommendedDimensions="Transparent logo preferred"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Name *</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    required
-                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Website URL</label>
-                                <input
-                                    type="url"
-                                    value={websiteUrl}
-                                    onChange={(e) => setWebsiteUrl(e.target.value)}
-                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Sort Order</label>
-                                <input
-                                    type="number"
-                                    value={sortOrder}
-                                    onChange={(e) => setSortOrder(Number(e.target.value))}
-                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent"
-                                />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    id="isActive"
-                                    checked={isActive}
-                                    onChange={(e) => setIsActive(e.target.checked)}
-                                    className="w-4 h-4"
-                                />
-                                <label htmlFor="isActive" className="text-sm text-text">Active</label>
+                            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Name *</label>
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        required
+                                        className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Website URL</label>
+                                    <input
+                                        type="url"
+                                        value={websiteUrl}
+                                        onChange={(e) => setWebsiteUrl(e.target.value)}
+                                        placeholder="https://example.com"
+                                        className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Sort Order</label>
+                                    <input
+                                        type="number"
+                                        value={sortOrder}
+                                        onChange={(e) => setSortOrder(Number(e.target.value))}
+                                        className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
+                                    />
+                                </div>
+                                <label className="flex min-h-[48px] items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3 text-sm text-text">
+                                    <input
+                                        type="checkbox"
+                                        checked={isActive}
+                                        onChange={(e) => setIsActive(e.target.checked)}
+                                        className="h-4 w-4 accent-accent"
+                                    />
+                                    Active
+                                </label>
                             </div>
                         </div>
-                        <div className="flex gap-4 pt-4">
+
+                        <div className="flex flex-col-reverse gap-3 border-t border-border px-5 py-4 sm:flex-row sm:justify-end">
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                className="inline-flex justify-center rounded-lg border border-border px-5 py-3 text-sm font-medium text-text transition-colors hover:border-accent hover:text-accent"
+                            >
+                                Cancel
+                            </button>
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
+                                className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {saving ? 'Saving...' : (editingId ? 'Update' : 'Create')}
-                            </button>
-                            <button type="button" onClick={resetForm} className="px-6 py-2 border border-border text-text rounded-lg hover:border-accent">
-                                Cancel
+                                <Save className="h-4 w-4" />
+                                {saving ? 'Saving...' : editingId ? 'Update Client' : 'Create Client'}
                             </button>
                         </div>
                     </form>
                 </div>
             )}
 
-            {/* Table */}
-            <div className="bg-card-bg border border-border rounded-lg overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-bg border-b border-border">
-                        <tr>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Order</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Logo</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Name</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Website</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Status</th>
-                            <th className="text-right px-6 py-4 text-sm font-medium text-text-muted">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {clients.map((client) => (
-                            <tr key={client.id} className="border-b border-border last:border-0 hover:bg-bg/50">
-                                <td className="px-6 py-4 text-text">{client.sort_order}</td>
-                                <td className="px-6 py-4">
-                                    {client.logo_url_bw ? (
-                                        <Image
-                                            src={client.logo_url_bw}
-                                            alt={client.name}
-                                            width={40}
-                                            height={40}
-                                            sizes="40px"
-                                            quality={60}
-                                            className="w-10 h-10 object-contain bg-white rounded"
-                                        />
-                                    ) : (
-                                        <div className="w-10 h-10 bg-border rounded flex items-center justify-center text-text-muted text-xs">
-                                            No logo
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="px-6 py-4 text-text font-medium">{client.name}</td>
-                                <td className="px-6 py-4 text-text-muted text-sm">
-                                    {client.website_url ? (
-                                        <a href={client.website_url} target="_blank" rel="noopener" className="text-accent hover:underline">
-                                            {client.website_url}
-                                        </a>
-                                    ) : '-'}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 text-xs rounded ${client.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                                        {client.is_active ? 'Active' : 'Inactive'}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    {client.logo_url_bw && (
-                                        <button
-                                            onClick={() => openLogoEditor(client)}
-                                            className="text-blue-400 hover:underline mr-4"
-                                        >
-                                            Edit Logo
-                                        </button>
-                                    )}
-                                    <button onClick={() => handleEdit(client)} className="text-accent hover:underline mr-4">Edit</button>
-                                    <button onClick={() => handleDelete(client.id)} className="text-red-400 hover:underline">Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {clients.length === 0 && (
-                    <div className="text-center py-8 text-text-muted">No clients yet. Add your first client!</div>
-                )}
-            </div>
+            <AdminDataTable
+                data={clients}
+                columns={columns}
+                emptyMessage="No clients yet. Add your first client."
+            />
 
-            {/* Photo Editor Modal */}
             {editingLogoUrl && (
                 <PhotoEditor
                     imageUrl={editingLogoUrl}
                     onSave={handleEditorSave}
-                    onCancel={() => {
-                        setEditingLogoUrl(null);
-                        setEditingClientId(null);
-                    }}
+                    onCancel={closeLogoEditor}
                     maxExportDimension={900}
                     exportQuality={0.86}
                 />

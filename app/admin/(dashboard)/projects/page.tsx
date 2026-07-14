@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getProjects, getClients, createProject, updateProject, deleteProject } from '@/lib/actions';
 import ImageUpload from '@/components/admin/ImageUpload';
 import PhotoEditor from '@/components/admin/PhotoEditor';
+import AdminDataTable from '@/components/admin/AdminDataTable';
 import type { Project, Client } from '@/lib/supabase/types';
-import { Plus, Trash2, GripVertical, Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Plus, Trash2, GripVertical, Pencil, X, ChevronLeft, ChevronRight, Search, Star, Images, ImageOff, RotateCcw, Save, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
 import {
     formatBytes,
@@ -13,6 +15,8 @@ import {
     MAX_UPLOAD_OUTPUT_SIZE,
     optimizeImageFile,
 } from '@/lib/clientImageOptimization';
+import { normalizeAssetUrl, normalizeAssetUrls } from '@/lib/asset-url';
+import { toast } from 'sonner';
 import {
     DndContext,
     closestCenter,
@@ -30,6 +34,8 @@ import {
     rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+const PROJECTS_PAGE_SIZE = 8;
 
 // Sortable Gallery Item Component
 interface SortableGalleryItemProps {
@@ -65,7 +71,7 @@ function SortableGalleryItem({ id, url, index, onRemove, onEdit, onPreview, onUp
                 {url && url !== 'uploading' ? (
                     <>
                         <Image
-                            src={url}
+                            src={normalizeAssetUrl(url) || url}
                             alt={`Gallery ${index + 1}`}
                             fill
                             sizes="(max-width: 768px) 50vw, 180px"
@@ -186,7 +192,7 @@ function Lightbox({ images, currentIndex, onClose, onNavigate }: LightboxProps) 
             {/* Image */}
             <div className="relative w-[90vw] h-[90vh]" onClick={(e) => e.stopPropagation()}>
                 <Image
-                    src={images[currentIndex]}
+                    src={normalizeAssetUrl(images[currentIndex]) || images[currentIndex]}
                     alt={`Gallery image ${currentIndex + 1}`}
                     fill
                     sizes="90vw"
@@ -209,6 +215,11 @@ export default function AdminProjectsPage() {
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [featuredFilter, setFeaturedFilter] = useState<'all' | 'featured' | 'standard'>('all');
+    const [mediaFilter, setMediaFilter] = useState<'all' | 'with-cover' | 'missing-cover' | 'with-gallery' | 'missing-gallery'>('all');
+    const [clientFilter, setClientFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
 
     // Form state
     const [title, setTitle] = useState('');
@@ -254,6 +265,10 @@ export default function AdminProjectsPage() {
         loadData();
     }, []);
 
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, featuredFilter, mediaFilter, clientFilter]);
+
     const loadData = async () => {
         setLoading(true);
         const [projectsData, clientsData] = await Promise.all([getProjects(), getClients()]);
@@ -283,8 +298,8 @@ export default function AdminProjectsPage() {
         setYear(project.year || '');
         setSite(project.site || '');
         setDuration(project.duration || '');
-        setImageUrl(project.image_url || '');
-        setGalleryUrls(project.gallery_urls || []);
+        setImageUrl(normalizeAssetUrl(project.image_url) || '');
+        setGalleryUrls(normalizeAssetUrls(project.gallery_urls));
         setClientId(project.client_id);
         setIsFeatured(project.is_featured);
         setSortOrder(project.sort_order);
@@ -295,6 +310,13 @@ export default function AdminProjectsPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (uploadProgress.uploading || galleryUrls.includes('uploading')) {
+            toast.error('Please wait until all gallery images finish uploading.');
+            return;
+        }
+
+        const safeGalleryUrls = galleryUrls.filter((url) => url && url !== 'uploading');
+
         const data = {
             title,
             description: description || undefined,
@@ -303,15 +325,26 @@ export default function AdminProjectsPage() {
             duration: duration || undefined,
             client_id: clientId || null,
             image_url: imageUrl || null,
-            gallery_urls: galleryUrls,
+            gallery_urls: safeGalleryUrls,
             is_featured: isFeatured,
             sort_order: sortOrder
         };
 
+        const result = editingId
+            ? await updateProject(editingId, data)
+            : await createProject(data);
+
+        if (!result.success) {
+            toast.error(result.error || 'Failed to save project');
+            return;
+        }
+
+        toast.success(editingId ? 'Project updated' : 'Project created');
+
         if (editingId) {
-            await updateProject(editingId, data);
+            setGalleryUrls(safeGalleryUrls);
         } else {
-            await createProject(data);
+            setGalleryUrls([]);
         }
 
         resetForm();
@@ -320,7 +353,12 @@ export default function AdminProjectsPage() {
 
     const handleDelete = async (id: string) => {
         if (confirm('Are you sure you want to delete this project?')) {
-            await deleteProject(id);
+            const result = await deleteProject(id);
+            if (!result.success) {
+                toast.error(result.error || 'Failed to delete project');
+                return;
+            }
+            toast.success('Project deleted');
             loadData();
         }
     };
@@ -366,15 +404,15 @@ export default function AdminProjectsPage() {
         formData.append('folder', editingImageType === 'cover' ? 'projects' : 'projects/gallery');
 
         const result = await uploadImage(formData);
-        if (result.success && result.url) {
-            if (editingImageType === 'cover') {
-                setImageUrl(result.url);
-            } else if (editingGalleryIndex >= 0) {
-                updateGalleryImage(editingGalleryIndex, result.url);
-            }
+        if (!result.success || !result.url) {
+            throw new Error(result.error || 'Failed to save edited image');
         }
 
-        setEditingImageUrl(null);
+        if (editingImageType === 'cover') {
+            setImageUrl(result.url);
+        } else if (editingGalleryIndex >= 0) {
+            updateGalleryImage(editingGalleryIndex, result.url);
+        }
     };
 
     const closePhotoEditor = () => {
@@ -426,108 +464,431 @@ export default function AdminProjectsPage() {
             updateGalleryImage(index, uploadedUrl);
         } catch (error) {
             updateGalleryImage(index, '');
-            alert(error instanceof Error ? error.message : 'Upload failed');
+            toast.error(error instanceof Error ? error.message : 'Upload failed');
         }
     };
 
+    const projectStats = useMemo(() => {
+        const totalGalleryImages = projects.reduce((sum, project) => sum + (project.gallery_urls?.length || 0), 0);
+        const withCover = projects.filter(project => Boolean(project.image_url)).length;
+        const featured = projects.filter(project => project.is_featured).length;
+
+        return {
+            total: projects.length,
+            featured,
+            withCover,
+            missingCover: projects.length - withCover,
+            totalGalleryImages,
+        };
+    }, [projects]);
+
+    const filteredProjects = useMemo(() => {
+        const normalizedSearch = searchQuery.trim().toLowerCase();
+
+        return projects.filter((project) => {
+            const galleryCount = project.gallery_urls?.length || 0;
+            const clientName = project.client?.name || '';
+            const matchesSearch = !normalizedSearch
+                || project.title.toLowerCase().includes(normalizedSearch)
+                || (project.year || '').toLowerCase().includes(normalizedSearch)
+                || (project.site || '').toLowerCase().includes(normalizedSearch)
+                || clientName.toLowerCase().includes(normalizedSearch);
+
+            const matchesFeatured = featuredFilter === 'all'
+                || (featuredFilter === 'featured' && project.is_featured)
+                || (featuredFilter === 'standard' && !project.is_featured);
+
+            const matchesMedia = mediaFilter === 'all'
+                || (mediaFilter === 'with-cover' && Boolean(project.image_url))
+                || (mediaFilter === 'missing-cover' && !project.image_url)
+                || (mediaFilter === 'with-gallery' && galleryCount > 0)
+                || (mediaFilter === 'missing-gallery' && galleryCount === 0);
+
+            const matchesClient = clientFilter === 'all' || project.client_id === clientFilter;
+
+            return matchesSearch && matchesFeatured && matchesMedia && matchesClient;
+        });
+    }, [clientFilter, featuredFilter, mediaFilter, projects, searchQuery]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PAGE_SIZE));
+    const paginatedProjects = filteredProjects.slice(
+        (currentPage - 1) * PROJECTS_PAGE_SIZE,
+        currentPage * PROJECTS_PAGE_SIZE
+    );
+    const hasActiveFilters = Boolean(searchQuery || featuredFilter !== 'all' || mediaFilter !== 'all' || clientFilter !== 'all');
+
+    useEffect(() => {
+        setCurrentPage((page) => Math.min(Math.max(page, 1), totalPages));
+    }, [totalPages]);
+
+    const clearFilters = () => {
+        setSearchQuery('');
+        setFeaturedFilter('all');
+        setMediaFilter('all');
+        setClientFilter('all');
+    };
+
+    const projectColumns = useMemo<ColumnDef<Project>[]>(
+        () => [
+            {
+                accessorKey: 'title',
+                header: 'Project',
+                cell: ({ row }) => {
+                    const project = row.original;
+                    const clientName = project.client?.name;
+
+                    return (
+                        <div className="flex items-center gap-4">
+                            {project.image_url ? (
+                                <div className="relative h-16 w-24 overflow-hidden rounded-md">
+                                    <Image
+                                        src={normalizeAssetUrl(project.image_url) || project.image_url}
+                                        alt={project.title}
+                                        fill
+                                        sizes="96px"
+                                        quality={55}
+                                        className="object-cover"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="flex h-16 w-24 items-center justify-center rounded-md border border-border bg-bg text-text-muted">
+                                    <ImageOff className="h-5 w-5" />
+                                </div>
+                            )}
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="max-w-[340px] truncate text-sm font-semibold text-text">{project.title}</p>
+                                    {project.is_featured && (
+                                        <span className="inline-flex items-center rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent">
+                                            Featured
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-muted">
+                                    <span>{clientName || 'No client'}</span>
+                                    <span>{project.site || 'No site'}</span>
+                                    <span>{project.duration || 'No duration'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                },
+            },
+            {
+                accessorKey: 'year',
+                header: 'Year',
+                cell: ({ row }) => <span className="text-sm text-text-muted">{row.original.year || '-'}</span>,
+                size: 110,
+            },
+            {
+                id: 'media',
+                header: 'Media',
+                sortingFn: (a, b) => (a.original.gallery_urls?.length || 0) - (b.original.gallery_urls?.length || 0),
+                cell: ({ row }) => {
+                    const project = row.original;
+                    const galleryCount = project.gallery_urls?.length || 0;
+
+                    return (
+                        <div className="flex flex-wrap gap-2">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${project.image_url ? 'bg-green-500/10 text-green-300' : 'bg-red-500/10 text-red-300'}`}>
+                                {project.image_url ? 'Cover ready' : 'No cover'}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${galleryCount > 0 ? 'bg-accent/15 text-accent' : 'bg-border text-text-muted'}`}>
+                                {galleryCount > 0 ? `${galleryCount} images` : 'No gallery'}
+                            </span>
+                        </div>
+                    );
+                },
+                size: 220,
+            },
+            {
+                accessorKey: 'is_featured',
+                header: 'Status',
+                cell: ({ row }) => (
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${row.original.is_featured ? 'bg-accent/15 text-accent' : 'bg-border text-text-muted'}`}>
+                        {row.original.is_featured ? 'Homepage' : 'Standard'}
+                    </span>
+                ),
+                size: 120,
+            },
+            {
+                accessorKey: 'sort_order',
+                header: 'Order',
+                cell: ({ row }) => <span className="text-sm text-text-muted">{row.original.sort_order}</span>,
+                size: 100,
+            },
+            {
+                id: 'actions',
+                header: 'Actions',
+                enableSorting: false,
+                cell: ({ row }) => (
+                    <div className="flex items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => handleEdit(row.original)}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-accent/10 hover:text-accent"
+                            aria-label={`Edit ${row.original.title}`}
+                        >
+                            <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleDelete(row.original.id)}
+                            className="rounded-md p-2 text-text-muted transition-colors hover:bg-red-500/10 hover:text-red-400"
+                            aria-label={`Delete ${row.original.title}`}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    </div>
+                ),
+                size: 120,
+            },
+        ],
+        [paginatedProjects]
+    );
+
     if (loading) {
-        return <div className="text-text-muted">Loading projects...</div>;
+        return (
+            <div className="flex min-h-[420px] items-center justify-center">
+                <div className="text-center">
+                    <div className="mx-auto mb-4 h-8 w-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+                    <p className="text-sm text-text-muted">Loading projects...</p>
+                </div>
+            </div>
+        );
     }
 
-    const validGalleryUrls = galleryUrls.filter(url => url && url !== 'uploading');
+    const validGalleryUrls = normalizeAssetUrls(galleryUrls.filter(url => url && url !== 'uploading'));
 
     return (
-        <div>
-            <div className="flex items-center justify-between mb-8">
-                <h1 className="text-3xl font-bold text-text">Projects</h1>
-                <button onClick={() => { resetForm(); setShowForm(true); }} className="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90">
-                    + Add Project
-                </button>
+        <div className="space-y-8">
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-accent">Portfolio CMS</p>
+                        <h1 className="text-3xl font-bold text-text">Projects</h1>
+                        <p className="mt-2 max-w-2xl text-sm text-text-muted">
+                            Project records, media readiness, and homepage visibility in one working view.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => { resetForm(); setShowForm(true); }}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Add Project
+                    </button>
+                </div>
+
+                <div className="grid overflow-hidden rounded-lg border border-border bg-card-bg md:grid-cols-5">
+                    <div className="border-b border-border p-4 md:border-b-0 md:border-r">
+                        <p className="text-xs uppercase tracking-[0.14em] text-text-muted">Total</p>
+                        <p className="mt-2 text-2xl font-semibold text-text">{projectStats.total}</p>
+                    </div>
+                    <div className="border-b border-border p-4 md:border-b-0 md:border-r">
+                        <p className="text-xs uppercase tracking-[0.14em] text-text-muted">Featured</p>
+                        <p className="mt-2 text-2xl font-semibold text-accent">{projectStats.featured}</p>
+                    </div>
+                    <div className="border-b border-border p-4 md:border-b-0 md:border-r">
+                        <p className="text-xs uppercase tracking-[0.14em] text-text-muted">With Cover</p>
+                        <p className="mt-2 text-2xl font-semibold text-text">{projectStats.withCover}</p>
+                    </div>
+                    <div className="border-b border-border p-4 md:border-b-0 md:border-r">
+                        <p className="text-xs uppercase tracking-[0.14em] text-text-muted">Missing Cover</p>
+                        <p className={`mt-2 text-2xl font-semibold ${projectStats.missingCover > 0 ? 'text-red-300' : 'text-text'}`}>
+                            {projectStats.missingCover}
+                        </p>
+                    </div>
+                    <div className="p-4">
+                        <p className="text-xs uppercase tracking-[0.14em] text-text-muted">Gallery Images</p>
+                        <p className="mt-2 text-2xl font-semibold text-text">{projectStats.totalGalleryImages}</p>
+                    </div>
+                </div>
+
+                <div className="rounded-lg border border-border bg-card-bg p-4">
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_190px_220px_auto]">
+                        <label className="relative block">
+                            <span className="sr-only">Search projects</span>
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                            <input
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search title, year, site, client..."
+                                className="h-11 w-full rounded-lg border border-border bg-bg pl-10 pr-4 text-sm text-text outline-none transition-colors focus:border-accent"
+                            />
+                        </label>
+
+                        <select
+                            value={featuredFilter}
+                            onChange={(e) => setFeaturedFilter(e.target.value as typeof featuredFilter)}
+                            className="h-11 rounded-lg border border-border bg-bg px-3 text-sm text-text outline-none transition-colors focus:border-accent"
+                            aria-label="Filter by featured state"
+                        >
+                            <option value="all">All visibility</option>
+                            <option value="featured">Featured only</option>
+                            <option value="standard">Not featured</option>
+                        </select>
+
+                        <select
+                            value={mediaFilter}
+                            onChange={(e) => setMediaFilter(e.target.value as typeof mediaFilter)}
+                            className="h-11 rounded-lg border border-border bg-bg px-3 text-sm text-text outline-none transition-colors focus:border-accent"
+                            aria-label="Filter by media state"
+                        >
+                            <option value="all">All media</option>
+                            <option value="with-cover">Has cover</option>
+                            <option value="missing-cover">Missing cover</option>
+                            <option value="with-gallery">Has gallery</option>
+                            <option value="missing-gallery">Missing gallery</option>
+                        </select>
+
+                        <select
+                            value={clientFilter}
+                            onChange={(e) => setClientFilter(e.target.value)}
+                            className="h-11 rounded-lg border border-border bg-bg px-3 text-sm text-text outline-none transition-colors focus:border-accent"
+                            aria-label="Filter by client"
+                        >
+                            <option value="all">All clients</option>
+                            {clients.map((client) => (
+                                <option key={client.id} value={client.id}>{client.name}</option>
+                            ))}
+                        </select>
+
+                        <button
+                            type="button"
+                            onClick={clearFilters}
+                            disabled={!hasActiveFilters}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <RotateCcw className="h-4 w-4" />
+                            Clear
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {showForm && (
-                <div className="bg-card-bg border border-border rounded-lg p-6 mb-8">
-                    <h2 className="text-xl font-bold text-text mb-4">{editingId ? 'Edit Project' : 'Add New Project'}</h2>
+                <div className="overflow-hidden rounded-lg border border-border bg-card-bg">
+                    <div className="flex flex-col gap-4 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+                                {editingId ? 'Project Editor' : 'New Project'}
+                            </p>
+                            <h2 className="text-xl font-bold text-text">{editingId ? title || 'Edit Project' : 'Add Project'}</h2>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+                            <span className={`inline-flex items-center rounded-full px-3 py-1 font-medium ${imageUrl ? 'bg-green-500/10 text-green-300' : 'bg-red-500/10 text-red-300'}`}>
+                                {imageUrl ? 'Cover ready' : 'No cover'}
+                            </span>
+                            <span className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1">
+                                <Images className="h-3.5 w-3.5 text-accent" />
+                                {galleryUrls.length}/15
+                            </span>
+                            <button
+                                type="button"
+                                onClick={resetForm}
+                                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent"
+                            >
+                                <X className="h-4 w-4" />
+                                Close
+                            </button>
+                        </div>
+                    </div>
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Basic Info Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-6 p-5 xl:grid-cols-[360px_minmax(0,1fr)]">
                             {/* Project Cover Image */}
-                            <div className="md:row-span-2">
+                            <div className="rounded-lg border border-border bg-bg/45 p-4">
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-text">Cover Image</label>
+                                        <p className="mt-1 text-xs text-text-muted">1200x800px</p>
+                                    </div>
+                                    {imageUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => openPhotoEditor(imageUrl, 'cover')}
+                                            className="inline-flex items-center gap-2 rounded-lg border border-accent px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent hover:text-bg"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                            Edit
+                                        </button>
+                                    )}
+                                </div>
                                 <ImageUpload
                                     currentUrl={imageUrl}
                                     onUpload={setImageUrl}
                                     folder="projects"
-                                    label="Cover Image"
+                                    label=""
                                     aspectRatio="4/3"
                                     minWidth={1200}
                                     minHeight={800}
-                                    recommendedDimensions="1200×800px"
+                                    recommendedDimensions="1200x800px"
                                 />
-                                {imageUrl && (
-                                    <button
-                                        type="button"
-                                        onClick={() => openPhotoEditor(imageUrl, 'cover')}
-                                        className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-accent border border-accent rounded-lg hover:bg-accent hover:text-white"
-                                    >
-                                        <Pencil className="w-4 h-4" />
-                                        Edit Cover Photo
-                                    </button>
-                                )}
                             </div>
 
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-text mb-2">Title *</label>
-                                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent" />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-text mb-2">Description</label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    rows={3}
-                                    placeholder="Project description shown in gallery footer..."
-                                    className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent resize-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Year</label>
-                                <input type="text" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024" className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Site/Location</label>
-                                <input type="text" value={site} onChange={(e) => setSite(e.target.value)} placeholder="Riyadh" className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Duration</label>
-                                <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="18 months" className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Client</label>
-                                <select value={clientId || ''} onChange={(e) => setClientId(e.target.value || null)} className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent">
-                                    <option value="">Select client...</option>
-                                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-text mb-2">Sort Order</label>
-                                <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className="w-full px-4 py-3 bg-bg border border-border rounded-lg text-text focus:outline-none focus:border-accent" />
-                            </div>
-                            <div className="flex items-center gap-2 pt-8">
-                                <input type="checkbox" id="isFeatured" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} className="w-4 h-4" />
-                                <label htmlFor="isFeatured" className="text-sm text-text">Featured on homepage</label>
+                            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                                <div className="lg:col-span-2">
+                                    <label className="mb-2 block text-sm font-medium text-text">Title *</label>
+                                    <input
+                                        type="text"
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        required
+                                        className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
+                                    />
+                                </div>
+                                <div className="lg:col-span-2">
+                                    <label className="mb-2 block text-sm font-medium text-text">Description</label>
+                                    <textarea
+                                        value={description}
+                                        onChange={(e) => setDescription(e.target.value)}
+                                        rows={4}
+                                        placeholder="Short portfolio description..."
+                                        className="w-full resize-none rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Year</label>
+                                    <input type="text" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2026" className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Site / Location</label>
+                                    <input type="text" value={site} onChange={(e) => setSite(e.target.value)} placeholder="Riyadh" className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Duration</label>
+                                    <input type="text" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="18 months" className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Client</label>
+                                    <select value={clientId || ''} onChange={(e) => setClientId(e.target.value || null)} className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none">
+                                        <option value="">Select client...</option>
+                                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-text">Sort Order</label>
+                                    <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-text focus:border-accent focus:outline-none" />
+                                </div>
+                                <label className="flex min-h-[48px] items-center gap-3 rounded-lg border border-border bg-bg px-4 py-3 text-sm text-text">
+                                    <input type="checkbox" id="isFeatured" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} className="h-4 w-4 accent-accent" />
+                                    Featured on homepage
+                                </label>
                             </div>
                         </div>
 
                         {/* Gallery Images Section */}
-                        <div className="border-t border-border pt-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <label className="text-sm font-medium text-text">
-                                    Gallery Images ({galleryUrls.length}/15) - <span className="text-text-muted">Drag to reorder, click to preview</span>
-                                </label>
-                                <div className="flex gap-2">
+                        <div className="border-t border-border px-5 py-5">
+                            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div>
+                                    <label className="text-sm font-semibold text-text">Gallery Images</label>
+                                    <p className="mt-1 text-xs text-text-muted">{galleryUrls.length}/15 uploaded</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
                                     {/* Bulk Upload Button */}
-                                    <label className="flex items-center gap-1 px-3 py-1 text-sm text-accent border border-accent rounded hover:bg-accent hover:text-bg cursor-pointer">
-                                        <Plus className="w-4 h-4" />
+                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-accent px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent hover:text-bg">
+                                        <UploadCloud className="h-4 w-4" />
                                         Bulk Upload
                                         <input
                                             type="file"
@@ -560,7 +921,7 @@ export default function AdminProjectsPage() {
 
                                                 setUploadProgress({ current: 0, total: 0, uploading: false });
                                                 if (failedUploads > 0) {
-                                                    alert(`${failedUploads} image(s) failed. ${lastError}`);
+                                                    toast.error(`${failedUploads} image(s) failed. ${lastError}`);
                                                 }
                                                 e.target.value = '';
                                             }}
@@ -571,9 +932,9 @@ export default function AdminProjectsPage() {
                                         <button
                                             type="button"
                                             onClick={() => addGalleryImage('')}
-                                            className="flex items-center gap-1 px-3 py-1 text-sm text-text-muted border border-border rounded hover:border-accent hover:text-accent"
+                                            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:border-accent hover:text-accent"
                                         >
-                                            <Plus className="w-4 h-4" />
+                                            <Plus className="h-4 w-4" />
                                             Add Slot
                                         </button>
                                     )}
@@ -583,11 +944,11 @@ export default function AdminProjectsPage() {
                             {/* Upload Progress Bar */}
                             {uploadProgress.uploading && (
                                 <div className="mb-4">
-                                    <div className="flex justify-between text-xs text-text-muted mb-1">
+                                    <div className="mb-1 flex justify-between text-xs text-text-muted">
                                         <span>Uploading images...</span>
                                         <span>{uploadProgress.current} / {uploadProgress.total}</span>
                                     </div>
-                                    <div className="h-2 bg-border rounded-full overflow-hidden">
+                                    <div className="h-2 overflow-hidden rounded-full bg-border">
                                         <div
                                             className="h-full bg-accent"
                                             style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
@@ -597,9 +958,11 @@ export default function AdminProjectsPage() {
                             )}
 
                             {galleryUrls.length === 0 ? (
-                                <p className="text-text-muted text-sm py-4">
-                                    No gallery images yet. Use &quot;Bulk Upload&quot; to add multiple images at once.
-                                </p>
+                                <div className="rounded-lg border border-dashed border-border bg-bg/50 px-6 py-10 text-center">
+                                    <Images className="mx-auto mb-3 h-8 w-8 text-text-muted" />
+                                    <p className="text-sm font-medium text-text">No gallery images</p>
+                                    <p className="mt-1 text-sm text-text-muted">Add project images when they are ready.</p>
+                                </div>
                             ) : (
                                 <DndContext
                                     sensors={sensors}
@@ -610,7 +973,7 @@ export default function AdminProjectsPage() {
                                         items={galleryUrls.map((_, i) => `gallery-${i}`)}
                                         strategy={rectSortingStrategy}
                                     >
-                                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
                                             {galleryUrls.map((url, index) => (
                                                 <SortableGalleryItem
                                                     key={`gallery-${index}`}
@@ -629,83 +992,98 @@ export default function AdminProjectsPage() {
                             )}
                         </div>
 
-                        <div className="flex gap-4 pt-4">
-                            <button type="submit" className="px-6 py-2 bg-accent text-white rounded-lg font-medium hover:opacity-90">{editingId ? 'Update' : 'Create'}</button>
-                            <button type="button" onClick={resetForm} className="px-6 py-2 border border-border text-text rounded-lg hover:border-accent">Cancel</button>
+                        <div className="flex flex-col-reverse gap-3 border-t border-border px-5 py-4 sm:flex-row sm:justify-end">
+                            <button type="button" onClick={resetForm} className="inline-flex items-center justify-center rounded-lg border border-border px-5 py-3 text-sm font-medium text-text transition-colors hover:border-accent hover:text-accent">
+                                Cancel
+                            </button>
+                            <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90">
+                                <Save className="h-4 w-4" />
+                                {editingId ? 'Update Project' : 'Create Project'}
+                            </button>
                         </div>
                     </form>
                 </div>
             )}
 
-            <div className="bg-card-bg border border-border rounded-lg overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-bg border-b border-border">
-                        <tr>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Order</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Image</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Title</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Year</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Gallery</th>
-                            <th className="text-left px-6 py-4 text-sm font-medium text-text-muted">Featured</th>
-                            <th className="text-right px-6 py-4 text-sm font-medium text-text-muted">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {projects.map((project) => (
-                            <tr key={project.id} className="border-b border-border last:border-0 hover:bg-bg/50">
-                                <td className="px-6 py-4 text-text">{project.sort_order}</td>
-                                <td className="px-6 py-4">
-                                    {project.image_url ? (
-                                        <Image
-                                            src={project.image_url}
-                                            alt={project.title}
-                                            width={64}
-                                            height={48}
-                                            sizes="64px"
-                                            quality={50}
-                                            className="w-16 h-12 object-cover rounded"
-                                        />
-                                    ) : (
-                                        <div className="w-16 h-12 bg-border rounded flex items-center justify-center text-text-muted text-xs">
-                                            No image
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="px-6 py-4 text-text font-medium">{project.title}</td>
-                                <td className="px-6 py-4 text-text-muted">{project.year || '-'}</td>
-                                <td className="px-6 py-4 text-text-muted">
-                                    {(project.gallery_urls?.length || 0) > 0 ? (
-                                        <span className="px-2 py-1 text-xs rounded bg-accent/20 text-accent">
-                                            {project.gallery_urls?.length} images
-                                        </span>
-                                    ) : '-'}
-                                </td>
-                                <td className="px-6 py-4">
-                                    {project.is_featured && <span className="px-2 py-1 text-xs rounded bg-accent/20 text-accent">Featured</span>}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <button
-                                            onClick={() => handleEdit(project)}
-                                            className="p-2 text-text-muted hover:text-accent hover:bg-accent/10 rounded-lg"
-                                            title="Edit project"
-                                        >
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(project.id)}
-                                            className="p-2 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg"
-                                            title="Delete project"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {projects.length === 0 && <div className="text-center py-8 text-text-muted">No projects yet.</div>}
+            <div className="overflow-hidden rounded-lg border border-border bg-card-bg">
+                <div className="flex flex-col gap-2 border-b border-border px-5 py-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 className="text-base font-semibold text-text">Project list</h2>
+                        <p className="text-sm text-text-muted">
+                            Showing {filteredProjects.length === 0 ? 0 : (currentPage - 1) * PROJECTS_PAGE_SIZE + 1}
+                            -{Math.min(currentPage * PROJECTS_PAGE_SIZE, filteredProjects.length)} of {filteredProjects.length}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-text-muted">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1">
+                            <Star className="h-3.5 w-3.5 text-accent" />
+                            {projectStats.featured} featured
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1">
+                            <Images className="h-3.5 w-3.5 text-accent" />
+                            {projectStats.totalGalleryImages} gallery images
+                        </span>
+                    </div>
+                </div>
+
+                {filteredProjects.length > 0 && (
+                    <AdminDataTable
+                        data={paginatedProjects}
+                        columns={projectColumns}
+                        embedded
+                        emptyMessage="No projects match this view."
+                    />
+                )}
+
+                {filteredProjects.length === 0 && (
+                    <div className="flex min-h-64 flex-col items-center justify-center border-t border-border px-6 py-12 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-bg text-text-muted">
+                            <Search className="h-5 w-5" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-text">No projects match this view</h3>
+                        <p className="mt-2 max-w-md text-sm text-text-muted">
+                            Clear the filters or add a new project to build the portfolio.
+                        </p>
+                        {hasActiveFilters && (
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="mt-5 inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text transition-colors hover:border-accent hover:text-accent"
+                            >
+                                <RotateCcw className="h-4 w-4" />
+                                Clear filters
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {filteredProjects.length > 0 && (
+                    <div className="flex flex-col gap-3 border-t border-border px-5 py-4 md:flex-row md:items-center md:justify-between">
+                        <p className="text-sm text-text-muted">
+                            Page {currentPage} of {totalPages}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                                disabled={currentPage === 1}
+                                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                                Previous
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                                disabled={currentPage === totalPages}
+                                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-text transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                Next
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Photo Editor Modal */}

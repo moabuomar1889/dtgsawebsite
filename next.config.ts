@@ -3,16 +3,26 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactCompiler: true,
   poweredByHeader: false,
+  turbopack: {},
+  webpack(config) {
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      canvas: false,
+    };
+
+    return config;
+  },
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "company-supabase.dtgsa.online",
+        hostname: "api.dtgsa.online",
         pathname: "/storage/v1/object/public/dtgsa-website-assets/**",
       },
       {
         protocol: "https",
-        hostname: "company-supabase.dtgsa.online",
+        hostname: "api.dtgsa.online",
         pathname: "/storage/v1/render/image/public/dtgsa-website-assets/**",
       },
     ],

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient as createSupabaseClient } from '@/lib/supabase/server';
+import { requireAdminUser, unauthorizedResult } from '@/lib/auth/admin';
 
 const BUCKET = 'dtgsa-website-assets';
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -13,6 +14,17 @@ const ALLOWED_UPLOAD_FOLDERS = new Set([
     'services',
     'settings',
 ]);
+
+export interface MediaAsset {
+    name: string;
+    path: string;
+    url: string;
+    folder: string;
+    size: number | null;
+    mimeType: string | null;
+    updatedAt: string | null;
+    createdAt: string | null;
+}
 
 function getFileExtension(file: File): string {
     const mimeExtension = {
@@ -32,10 +44,29 @@ function getFileExtension(file: File): string {
     return extension || 'img';
 }
 
+function normalizeStoragePath(path: string): string {
+    return path.replace(/^\/+/, '').replace(/\/+/g, '/');
+}
+
+function isAllowedStoragePath(path: string): boolean {
+    const normalizedPath = normalizeStoragePath(path);
+
+    if (normalizedPath.includes('..')) {
+        return false;
+    }
+
+    return Array.from(ALLOWED_UPLOAD_FOLDERS).some((folder) => normalizedPath.startsWith(`${folder}/`));
+}
+
 export async function uploadImage(
     formData: FormData
 ): Promise<{ success: boolean; url?: string; error?: string }> {
     const supabase = await createSupabaseClient();
+    try {
+        await requireAdminUser(supabase);
+    } catch {
+        return unauthorizedResult();
+    }
 
     const file = formData.get('file') as File;
     const folder = formData.get('folder') as string || 'images';
@@ -81,8 +112,87 @@ export async function uploadImage(
     return { success: true, url: urlData.publicUrl };
 }
 
+export async function listMediaAssets(
+    folder: string = 'images'
+): Promise<{ success: boolean; data?: MediaAsset[]; error?: string }> {
+    const supabase = await createSupabaseClient();
+    try {
+        await requireAdminUser(supabase);
+    } catch {
+        return unauthorizedResult();
+    }
+
+    if (!ALLOWED_UPLOAD_FOLDERS.has(folder)) {
+        return { success: false, error: 'Media folder is not allowed' };
+    }
+
+    const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .list(folder, {
+            limit: 200,
+            offset: 0,
+            sortBy: { column: 'updated_at', order: 'desc' },
+        });
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+
+    const assets = (data || [])
+        .filter((item) => item.id)
+        .map((item) => {
+            const path = `${folder}/${item.name}`;
+            const { data: urlData } = supabase.storage
+                .from(BUCKET)
+                .getPublicUrl(path);
+
+            return {
+                name: item.name,
+                path,
+                url: urlData.publicUrl,
+                folder,
+                size: typeof item.metadata?.size === 'number' ? item.metadata.size : null,
+                mimeType: typeof item.metadata?.mimetype === 'string' ? item.metadata.mimetype : null,
+                updatedAt: item.updated_at || null,
+                createdAt: item.created_at || null,
+            };
+        });
+
+    return { success: true, data: assets };
+}
+
+export async function deleteMediaAsset(path: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = await createSupabaseClient();
+    try {
+        await requireAdminUser(supabase);
+    } catch {
+        return unauthorizedResult();
+    }
+
+    const normalizedPath = normalizeStoragePath(path);
+
+    if (!isAllowedStoragePath(normalizedPath)) {
+        return { success: false, error: 'Media path is not allowed' };
+    }
+
+    const { error } = await supabase.storage
+        .from(BUCKET)
+        .remove([normalizedPath]);
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+
+    return { success: true };
+}
+
 export async function deleteImage(url: string): Promise<{ success: boolean; error?: string }> {
     const supabase = await createSupabaseClient();
+    try {
+        await requireAdminUser(supabase);
+    } catch {
+        return unauthorizedResult();
+    }
 
     // Extract path from URL
     const match = url.match(new RegExp(`/storage/v1/object/public/${BUCKET}/(.+)$`));
@@ -90,7 +200,11 @@ export async function deleteImage(url: string): Promise<{ success: boolean; erro
         return { success: false, error: 'Invalid URL' };
     }
 
-    const path = match[1];
+    const path = normalizeStoragePath(match[1]);
+
+    if (!isAllowedStoragePath(path)) {
+        return { success: false, error: 'Media path is not allowed' };
+    }
 
     const { error } = await supabase.storage
         .from(BUCKET)

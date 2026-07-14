@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { isAdminUser } from '@/lib/auth/admin';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 export default async function AdminRootLayout({
@@ -10,7 +11,7 @@ export default async function AdminRootLayout({
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!isAdminUser(user)) {
         redirect('/admin/login');
     }
 

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isAdminUser } from '@/lib/auth/admin';
 
 export async function proxy(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
@@ -34,18 +35,20 @@ export async function proxy(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser();
 
-    // Protect admin routes (except login)
+    // Protect admin routes (except public auth pages)
     const isAdminRoute = request.nextUrl.pathname.startsWith('/admin');
     const isLoginPage = request.nextUrl.pathname === '/admin/login';
+    const isResetPasswordPage = request.nextUrl.pathname === '/admin/reset-password';
+    const isPublicAdminAuthPage = isLoginPage || isResetPasswordPage;
 
-    if (isAdminRoute && !isLoginPage && !user) {
+    if (isAdminRoute && !isPublicAdminAuthPage && !isAdminUser(user)) {
         // Redirect to login if not authenticated
         const url = request.nextUrl.clone();
         url.pathname = '/admin/login';
         return NextResponse.redirect(url);
     }
 
-    if (isLoginPage && user) {
+    if (isLoginPage && isAdminUser(user)) {
         // Redirect to admin dashboard if already logged in
         const url = request.nextUrl.clone();
         url.pathname = '/admin';
