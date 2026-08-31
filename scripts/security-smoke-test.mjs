@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict';
 
-process.env.ADMIN_EMAILS = 'admin@example.com, second@example.com';
+const { hashPassword, verifyPassword } = await import('../lib/auth/password.ts');
 
-const { isAdminUser } = await import('../lib/auth/admin.ts');
+const password = 'a secure admin password';
+const hash = await hashPassword(password);
 
-assert.equal(isAdminUser(null), false);
-assert.equal(isAdminUser({ email: 'user@example.com', app_metadata: {} }), false);
-assert.equal(isAdminUser({ email: 'admin@example.com', app_metadata: {} }), true);
-assert.equal(isAdminUser({ email: 'ADMIN@example.com', app_metadata: {} }), true);
-assert.equal(isAdminUser({ email: 'user@example.com', app_metadata: { role: 'admin' } }), true);
-assert.equal(isAdminUser({ email: 'mo.abuomar@dtgsa.com', app_metadata: {} }), true);
+assert.match(hash, /^scrypt-v1\$/);
+assert.equal(await verifyPassword(password, hash), true);
+assert.equal(await verifyPassword('wrong password', hash), false);
+assert.equal(await verifyPassword(password, 'invalid'), false);
 
 console.log('security smoke tests passed');

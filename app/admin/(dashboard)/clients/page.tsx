@@ -10,7 +10,7 @@ import ImageUpload from '@/components/admin/ImageUpload';
 import PhotoEditor from '@/components/admin/PhotoEditor';
 import { uploadImage } from '@/lib/storage';
 import { normalizeAssetUrl } from '@/lib/asset-url';
-import type { Client } from '@/lib/supabase/types';
+import type { Client } from '@/lib/types/content';
 import AdminDataTable from '@/components/admin/AdminDataTable';
 
 export default function AdminClientsPage() {
@@ -38,7 +38,8 @@ export default function AdminClientsPage() {
     };
 
     useEffect(() => {
-        void loadClients();
+        const timer = window.setTimeout(() => void loadClients(), 0);
+        return () => window.clearTimeout(timer);
     }, []);
 
     const resetForm = () => {

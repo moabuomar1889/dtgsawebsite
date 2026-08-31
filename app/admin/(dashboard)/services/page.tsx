@@ -6,7 +6,7 @@ import { Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import { getServices, createService, updateService, deleteService } from '@/lib/actions';
-import type { Service } from '@/lib/supabase/types';
+import type { Service } from '@/lib/types/content';
 import ImageUpload from '@/components/admin/ImageUpload';
 import AdminDataTable from '@/components/admin/AdminDataTable';
 import { normalizeAssetUrl } from '@/lib/asset-url';
@@ -32,7 +32,8 @@ export default function AdminServicesPage() {
     };
 
     useEffect(() => {
-        void loadServices();
+        const timer = window.setTimeout(() => void loadServices(), 0);
+        return () => window.clearTimeout(timer);
     }, []);
 
     const resetForm = () => {

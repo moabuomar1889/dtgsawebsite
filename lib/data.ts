@@ -1,4 +1,4 @@
-// Mock data structured to match future Supabase schema (Durrat Construction)
+// Static presentation data used by the Durrat Construction website.
 
 export interface Project {
     id: string;
@@ -39,12 +39,6 @@ export interface Capability {
     icon: string;
 }
 
-export interface SocialLink {
-    platform: string;
-    url: string;
-    icon: string;
-}
-
 export interface Skill {
     id: string;
     name: string;
@@ -74,22 +68,13 @@ export function getYearsOfExperience(): number {
     return BASE_YEARS + Math.max(0, currentYear - BASE_YEAR);
 }
 
-// Social links
-export const socialLinks: SocialLink[] = [
-    { platform: 'Facebook', url: 'https://facebook.com', icon: 'facebook' },
-    { platform: 'Twitter', url: 'https://twitter.com', icon: 'twitter' },
-    { platform: 'Instagram', url: 'https://instagram.com', icon: 'instagram' },
-];
-
 // Navigation items
 export const navItems = [
     { label: 'Home', href: '#home' },
     { label: 'About', href: '#about' },
     { label: 'Experience', href: '#experience' },
     { label: 'Services', href: '#services' },
-    { label: 'Projects', href: '#projects' },
     { label: 'Clients', href: '#clients' },
-    { label: 'News', href: '#news' },
     { label: 'Contact', href: '#contact' },
 ];
 
@@ -288,11 +273,3 @@ export const capabilities: Capability[] = [
         icon: 'commissioning',
     },
 ];
-
-// Contact information
-export const contactInfo = {
-    phone: '+966 (0) 123 456 789',
-    email: 'info@durratconstruction.com',
-    address: 'Riyadh, Saudi Arabia',
-    tagline: 'Building the energy infrastructure of tomorrow',
-};

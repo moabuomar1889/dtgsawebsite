@@ -1,6 +1,6 @@
 import type { PublicContent } from '@/backend/models/public-content';
-import { FilePublicDataSnapshotRepository } from '@/backend/repositories/file-public-data-snapshot-repository';
-import { SupabasePublicContentRepository } from '@/backend/repositories/supabase-public-content-repository';
+import { NoOpPublicDataSnapshotRepository } from '@/backend/repositories/no-op-public-data-snapshot-repository';
+import { PrismaPublicContentRepository } from '@/backend/repositories/prisma-public-content-repository';
 import { PublicContentService } from '@/backend/services/public-content-service';
 import {
     fallbackClients,
@@ -25,13 +25,10 @@ let publicContentService: PublicContentService | null = null;
 export function getPublicContentService(): PublicContentService {
     if (!publicContentService) {
         publicContentService = new PublicContentService(
-            new SupabasePublicContentRepository(),
-            new FilePublicDataSnapshotRepository(),
+            new PrismaPublicContentRepository(),
+            new NoOpPublicDataSnapshotRepository(),
             fallbackContent,
-            () => Boolean(
-                process.env.NEXT_PUBLIC_SUPABASE_URL
-                && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-            )
+            () => Boolean(process.env.DATABASE_URL)
         );
     }
 

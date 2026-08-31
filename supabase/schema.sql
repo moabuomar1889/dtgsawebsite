@@ -1,8 +1,0 @@
--- DURRAT Website database setup
---
--- The private Supabase instance uses a separate database/project for this site,
--- so CMS tables live in the default public schema. Do not recreate the old
--- dtgsawebsite schema for the private server.
---
--- Apply the canonical setup from:
--- supabase/migrations/setup_public_site_tables.sql

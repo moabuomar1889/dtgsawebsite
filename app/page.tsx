@@ -1,4 +1,6 @@
 import { getPublicContentService } from '@/backend/config/public-content';
+import { normalizeAssetUrl } from '@/lib/asset-url';
+import { fallbackSettings } from '@/lib/fallback-data';
 import { normalizeHexColor } from '@/lib/theme-colors';
 import HomePageClient from './HomePageClient';
 
@@ -10,6 +12,13 @@ export default async function HomePage() {
   // Fetch settings server-side
   const settings = await getPublicContentService().getSettings();
   const accentColor = normalizeHexColor(settings.accent_color);
+  const contactDetails = {
+    email: settings.contact_email ?? fallbackSettings.contact_email,
+    phone: settings.contact_phone ?? fallbackSettings.contact_phone,
+    address: settings.contact_address ?? fallbackSettings.contact_address,
+  };
+  const heroImageUrl = normalizeAssetUrl(settings.hero_image_url)
+    ?? fallbackSettings.hero_image_url;
 
   return (
     <>
@@ -17,7 +26,10 @@ export default async function HomePage() {
       <style dangerouslySetInnerHTML={{
         __html: `:root { --color-accent: ${accentColor}; }`
       }} />
-      <HomePageClient />
+      <HomePageClient
+        contactDetails={contactDetails}
+        heroImageUrl={heroImageUrl}
+      />
     </>
   );
 }

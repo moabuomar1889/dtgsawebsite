@@ -3,7 +3,7 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef, useEffect, useState } from 'react';
 import { staggerContainer, staggerItem } from '@/lib/motion';
-import type { Client } from '@/lib/supabase/types';
+import type { Client } from '@/lib/types/content';
 import GilberCard from '@/components/ui/GilberCard';
 import Image from 'next/image';
 

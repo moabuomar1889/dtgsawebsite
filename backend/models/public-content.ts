@@ -5,7 +5,7 @@ import type {
     Project,
     Service,
     Settings,
-} from '@/lib/supabase/types';
+} from '@/lib/types/content';
 
 export interface PublicContent {
     settings: Partial<Settings>;

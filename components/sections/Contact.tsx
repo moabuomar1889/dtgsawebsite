@@ -3,9 +3,19 @@
 import { motion, useInView } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { staggerContainer, staggerItem } from '@/lib/motion';
-import { contactInfo, socialLinks } from '@/lib/data';
+import { submitContactMessage } from '@/lib/actions';
 
-export default function Contact() {
+export interface ContactDetails {
+    email: string;
+    phone: string;
+    address: string;
+}
+
+interface ContactProps {
+    contactDetails: ContactDetails;
+}
+
+export default function Contact({ contactDetails }: ContactProps) {
     const ref = useRef(null);
     const isInView = useInView(ref, { once: true, margin: "-100px" });
     const [formData, setFormData] = useState({
@@ -13,11 +23,22 @@ export default function Contact() {
         email: '',
         message: '',
     });
+    const [submitting, setSubmitting] = useState(false);
+    const [submitMessage, setSubmitMessage] = useState<{ success: boolean; text: string } | null>(null);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Form submission will be implemented with Supabase in future step
-        alert('Form submission will be connected to backend in next step!');
+        setSubmitting(true);
+        setSubmitMessage(null);
+
+        const result = await submitContactMessage(formData);
+        if (result.success) {
+            setFormData({ name: '', email: '', message: '' });
+            setSubmitMessage({ success: true, text: 'Your message has been sent.' });
+        } else {
+            setSubmitMessage({ success: false, text: result.error ?? 'Unable to send your message.' });
+        }
+        setSubmitting(false);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -41,7 +62,7 @@ export default function Contact() {
                         </motion.span>
 
                         <motion.h2 variants={staggerItem} className="text-4xl md:text-5xl font-bold mb-6">
-                            {contactInfo.tagline}
+                            Building the energy infrastructure of tomorrow
                         </motion.h2>
                     </div>
 
@@ -53,41 +74,26 @@ export default function Contact() {
                             <div className="space-y-6">
                                 <div>
                                     <div className="text-sm text-text-muted mb-2">Email</div>
-                                    <a href={`mailto:${contactInfo.email}`} className="text-xl text-text hover:text-accent transition-colors duration-200">
-                                        {contactInfo.email}
+                                    <a href={`mailto:${contactDetails.email}`} className="text-xl text-text hover:text-accent transition-colors duration-200">
+                                        {contactDetails.email}
                                     </a>
                                 </div>
 
                                 <div>
                                     <div className="text-sm text-text-muted mb-2">Phone</div>
-                                    <a href={`tel:${contactInfo.phone}`} className="text-xl text-text hover:text-accent transition-colors duration-200">
-                                        {contactInfo.phone}
+                                    <a href={`tel:${contactDetails.phone}`} className="text-xl text-text hover:text-accent transition-colors duration-200">
+                                        {contactDetails.phone}
                                     </a>
                                 </div>
 
                                 <div>
                                     <div className="text-sm text-text-muted mb-2">Location</div>
-                                    <div className="text-xl text-text">{contactInfo.address}</div>
+                                    <div className="text-xl text-text">{contactDetails.address}</div>
                                 </div>
                             </div>
 
-                            {/* Social Links */}
                             <div className="mt-12">
-                                <div className="text-sm text-text-muted mb-4">Follow Us</div>
-                                <div className="flex gap-4">
-                                    {socialLinks.map((social) => (
-                                        <a
-                                            key={social.platform}
-                                            href={social.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="w-12 h-12 rounded-lg border border-border flex items-center justify-center hover:border-accent hover:text-accent transition-colors duration-200"
-                                            aria-label={social.platform}
-                                        >
-                                            <span className="text-sm font-medium">{social.platform[0]}</span>
-                                        </a>
-                                    ))}
-                                </div>
+                                <div className="text-sm text-text-muted">Follow Us</div>
                             </div>
                         </motion.div>
 
@@ -143,10 +149,19 @@ export default function Contact() {
 
                             <button
                                 type="submit"
-                                className="w-full px-8 py-4 bg-accent text-white rounded-lg font-medium hover:opacity-90 transition-opacity duration-200"
+                                disabled={submitting}
+                                className="w-full px-8 py-4 bg-accent text-white rounded-lg font-medium hover:opacity-90 transition-opacity duration-200 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                Send Message
+                                {submitting ? 'Sending...' : 'Send Message'}
                             </button>
+                            {submitMessage && (
+                                <p
+                                    className={submitMessage.success ? 'text-sm text-green-400' : 'text-sm text-red-400'}
+                                    role={submitMessage.success ? 'status' : 'alert'}
+                                >
+                                    {submitMessage.text}
+                                </p>
+                            )}
                         </motion.form>
                     </div>
                 </motion.div>

@@ -62,10 +62,9 @@ dtgsa-website/
 │   └── useScrollSpy.ts
 │
 ├── lib/
-│   ├── supabase/
-│   │   ├── client.ts
-│   │   ├── server.ts
-│   │   └── types.ts
+│   ├── auth/
+│   ├── types/
+│   ├── db.ts
 │   ├── actions.ts
 │   ├── data-fetching.ts
 │   ├── data.ts
@@ -78,8 +77,10 @@ dtgsa-website/
 ├── public/
 │   └── placeholders/
 │
-├── supabase/
-│   └── schema.sql
+├── prisma/
+│   ├── migrations/
+│   ├── schema.prisma
+│   └── seed.ts
 │
 ├── .env.local
 ├── .gitignore
@@ -154,16 +155,16 @@ dtgsa-website/
 | `actions.ts` | Server actions for CRUD operations |
 | `data-fetching.ts` | Data fetching utilities |
 | `motion.ts` | Framer Motion animation variants |
-| `storage.ts` | Supabase storage utilities |
+| `storage.ts` | PostgreSQL-backed media utilities |
 | `theme.tsx` | Theme context provider |
 
-### `/lib/supabase` - Database
+### `/lib/auth` and `/lib/types`
 
 | File | Description |
 |------|-------------|
-| `client.ts` | Supabase browser client |
-| `server.ts` | Supabase server client |
-| `types.ts` | TypeScript types for database |
+| `session.ts` | Database-backed admin sessions |
+| `password.ts` | Password hashing and verification |
+| `types/content.ts` | Public-content TypeScript types |
 
 ### `/hooks` - Custom React Hooks
 

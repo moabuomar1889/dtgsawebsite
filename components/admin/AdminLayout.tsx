@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -19,7 +19,6 @@ import {
     Wrench,
     type LucideIcon,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 
 interface AdminLayoutProps {
     children: React.ReactNode;
@@ -58,7 +57,6 @@ const navItems = navGroups.flatMap((group) => group.items);
 export default function AdminLayout({ children }: AdminLayoutProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const supabase = useMemo(() => createClient(), []);
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
     const activeItem = navItems.find((item) => {
@@ -70,7 +68,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }) || navItems[0];
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        await fetch('/api/admin/logout', { method: 'POST' });
         router.push('/admin/login');
         router.refresh();
     };

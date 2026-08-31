@@ -2,11 +2,19 @@
   "name": "dtgsa-website",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "build": "prisma generate && next build",
+    "start": "prisma migrate deploy && prisma db seed && next start -H 0.0.0.0",
+    "lint": "eslint",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "test:security": "tsx scripts/security-smoke-test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -14,9 +22,9 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fullpage/react-fullpage": "^0.1.49",
     "@hookform/resolvers": "^5.4.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "@studio-freight/lenis": "^1.0.42",
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.91.1",
     "@tanstack/react-table": "^8.21.3",
     "@uppy/core": "^5.2.0",
     "@uppy/dashboard": "^5.1.1",
@@ -25,7 +33,9 @@
     "filepond": "^4.32.12",
     "framer-motion": "^12.29.0",
     "lucide-react": "^0.563.0",
-    "next": "^16.2.9",
+    "next": "16.3.3",
+    "pg": "^8.23.0",
+    "prisma": "^7.10.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-filepond": "^7.1.3",
@@ -35,12 +45,14 @@
     "react-konva": "^19.2.5",
     "sonner": "^2.0.7",
     "styled-components": "^6.4.2",
+    "tsx": "^4.23.13",
     "uppy": "^5.2.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
@@ -51,8 +63,8 @@
   },
   "overrides": {
     "@babel/core": "7.29.7",
-    "js-yaml": "4.2.0",
-    "postcss": "8.5.10",
+    "js-yaml": "5.4.1",
+    "postcss": "8.5.26",
     "ws": "8.21.0"
   }
 }

@@ -2,6 +2,28 @@ import type { PublicContent, PublicContentKey } from '@/backend/models/public-co
 import type { PublicContentRepository } from '@/backend/repositories/public-content-repository';
 import type { PublicDataSnapshotRepository } from '@/backend/repositories/public-data-snapshot-repository';
 import { hasUsableData } from '@/backend/shared/has-usable-data';
+import {
+    normalizeClientAssets,
+    normalizeNewsAssets,
+    normalizeProjectAssets,
+    normalizeSettingsAssets,
+} from '@/lib/public-content-assets';
+
+function describeError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    if (error && typeof error === 'object') {
+        try {
+            return JSON.stringify(error);
+        } catch {
+            return 'Unknown data source error';
+        }
+    }
+
+    return String(error);
+}
 
 export class PublicContentService {
     constructor(
@@ -11,20 +33,24 @@ export class PublicContentService {
         private readonly isDataSourceConfigured: () => boolean
     ) {}
 
-    getSettings(): Promise<PublicContent['settings']> {
-        return this.load('settings', () => this.contentRepository.loadSettings());
+    async getSettings(): Promise<PublicContent['settings']> {
+        const settings = await this.load('settings', () => this.contentRepository.loadSettings());
+        return normalizeSettingsAssets(settings);
     }
 
-    getClients(): Promise<PublicContent['clients']> {
-        return this.load('clients', () => this.contentRepository.loadClients());
+    async getClients(): Promise<PublicContent['clients']> {
+        const clients = await this.load('clients', () => this.contentRepository.loadClients());
+        return clients.map(normalizeClientAssets);
     }
 
-    getProjects(): Promise<PublicContent['projects']> {
-        return this.load('projects', () => this.contentRepository.loadProjects());
+    async getProjects(): Promise<PublicContent['projects']> {
+        const projects = await this.load('projects', () => this.contentRepository.loadProjects());
+        return projects.map(normalizeProjectAssets);
     }
 
-    getNews(): Promise<PublicContent['news']> {
-        return this.load('news', () => this.contentRepository.loadNews());
+    async getNews(): Promise<PublicContent['news']> {
+        const news = await this.load('news', () => this.contentRepository.loadNews());
+        return news.map(normalizeNewsAssets);
     }
 
     getExperience(): Promise<PublicContent['experience']> {
@@ -74,7 +100,9 @@ export class PublicContentService {
             await this.snapshotRepository.write(key, data);
             return data;
         } catch (error) {
-            console.error(`Error fetching ${key}:`, error);
+            console.warn(
+                `Unable to fetch ${key}; using the local snapshot or fallback data: ${describeError(error)}`
+            );
             return this.readSnapshotOrFallback(key);
         }
     }

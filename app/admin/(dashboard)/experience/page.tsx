@@ -5,7 +5,7 @@ import { Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import { getExperience, createExperience, updateExperience, deleteExperience } from '@/lib/actions';
-import type { Experience } from '@/lib/supabase/types';
+import type { Experience } from '@/lib/types/content';
 import AdminDataTable from '@/components/admin/AdminDataTable';
 
 export default function AdminExperiencePage() {
@@ -31,7 +31,8 @@ export default function AdminExperiencePage() {
     };
 
     useEffect(() => {
-        void loadExperience();
+        const timer = window.setTimeout(() => void loadExperience(), 0);
+        return () => window.clearTimeout(timer);
     }, []);
 
     const resetForm = () => {

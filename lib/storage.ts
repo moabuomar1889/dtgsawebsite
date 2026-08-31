@@ -1,9 +1,8 @@
-"use server";
+'use server';
 
-import { createClient as createSupabaseClient } from '@/lib/supabase/server';
+import { getPrisma } from '@/lib/db';
 import { requireAdminUser, unauthorizedResult } from '@/lib/auth/admin';
 
-const BUCKET = 'dtgsa-website-assets';
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_UPLOAD_FOLDERS = new Set([
     'clients',
@@ -13,6 +12,13 @@ const ALLOWED_UPLOAD_FOLDERS = new Set([
     'projects/gallery',
     'services',
     'settings',
+]);
+const ALLOWED_IMAGE_TYPES = new Set([
+    'image/avif',
+    'image/gif',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
 ]);
 
 export interface MediaAsset {
@@ -26,22 +32,21 @@ export interface MediaAsset {
     createdAt: string | null;
 }
 
+type MediaActionResult = {
+    success: boolean;
+    data?: MediaAsset[];
+    url?: string;
+    error?: string;
+};
+
 function getFileExtension(file: File): string {
-    const mimeExtension = {
+    return {
         'image/avif': 'avif',
         'image/gif': 'gif',
         'image/jpeg': 'jpg',
         'image/png': 'png',
-        'image/svg+xml': 'svg',
         'image/webp': 'webp',
-    }[file.type];
-
-    if (mimeExtension) {
-        return mimeExtension;
-    }
-
-    const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return extension || 'img';
+    }[file.type] ?? 'img';
 }
 
 function normalizeStoragePath(path: string): string {
@@ -50,169 +55,103 @@ function normalizeStoragePath(path: string): string {
 
 function isAllowedStoragePath(path: string): boolean {
     const normalizedPath = normalizeStoragePath(path);
+    return !normalizedPath.includes('..')
+        && Array.from(ALLOWED_UPLOAD_FOLDERS).some((folder) => normalizedPath.startsWith(`${folder}/`));
+}
 
-    if (normalizedPath.includes('..')) {
+async function isAuthorized(): Promise<boolean> {
+    try {
+        await requireAdminUser();
+        return true;
+    } catch {
         return false;
     }
-
-    return Array.from(ALLOWED_UPLOAD_FOLDERS).some((folder) => normalizedPath.startsWith(`${folder}/`));
 }
 
-export async function uploadImage(
-    formData: FormData
-): Promise<{ success: boolean; url?: string; error?: string }> {
-    const supabase = await createSupabaseClient();
+export async function uploadImage(formData: FormData): Promise<MediaActionResult> {
+    if (!await isAuthorized()) return unauthorizedResult();
+
+    const file = formData.get('file');
+    const folderValue = formData.get('folder');
+    const folder = typeof folderValue === 'string' ? folderValue : 'images';
+
+    if (!(file instanceof File)) return { success: false, error: 'No file provided' };
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) return { success: false, error: 'Unsupported image type' };
+    if (file.size > MAX_FILE_SIZE) return { success: false, error: 'Image must be less than 5MB after optimization' };
+    if (!ALLOWED_UPLOAD_FOLDERS.has(folder)) return { success: false, error: 'Upload folder is not allowed' };
+
     try {
-        await requireAdminUser(supabase);
-    } catch {
-        return unauthorizedResult();
-    }
-
-    const file = formData.get('file') as File;
-    const folder = formData.get('folder') as string || 'images';
-
-    if (!file) {
-        return { success: false, error: 'No file provided' };
-    }
-
-    if (!file.type.startsWith('image/')) {
-        return { success: false, error: 'Only image uploads are allowed' };
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-        return { success: false, error: 'Image must be less than 5MB after optimization' };
-    }
-
-    if (!ALLOWED_UPLOAD_FOLDERS.has(folder)) {
-        return { success: false, error: 'Upload folder is not allowed' };
-    }
-
-    // Generate unique filename
-    const ext = getFileExtension(file);
-    const filename = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
-
-    const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .upload(filename, file, {
-            cacheControl: '31536000',
-            contentType: file.type || undefined,
-            upsert: false,
-        });
-
-    if (error) {
-        console.error('Upload error:', error);
-        return { success: false, error: error.message };
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(data.path);
-
-    return { success: true, url: urlData.publicUrl };
-}
-
-export async function listMediaAssets(
-    folder: string = 'images'
-): Promise<{ success: boolean; data?: MediaAsset[]; error?: string }> {
-    const supabase = await createSupabaseClient();
-    try {
-        await requireAdminUser(supabase);
-    } catch {
-        return unauthorizedResult();
-    }
-
-    if (!ALLOWED_UPLOAD_FOLDERS.has(folder)) {
-        return { success: false, error: 'Media folder is not allowed' };
-    }
-
-    const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .list(folder, {
-            limit: 200,
-            offset: 0,
-            sortBy: { column: 'updated_at', order: 'desc' },
-        });
-
-    if (error) {
-        return { success: false, error: error.message };
-    }
-
-    const assets = (data || [])
-        .filter((item) => item.id)
-        .map((item) => {
-            const path = `${folder}/${item.name}`;
-            const { data: urlData } = supabase.storage
-                .from(BUCKET)
-                .getPublicUrl(path);
-
-            return {
-                name: item.name,
+        const name = `${Date.now()}-${crypto.randomUUID()}.${getFileExtension(file)}`;
+        const path = `${folder}/${name}`;
+        const record = await getPrisma().mediaAsset.create({
+            data: {
+                name,
                 path,
-                url: urlData.publicUrl,
                 folder,
-                size: typeof item.metadata?.size === 'number' ? item.metadata.size : null,
-                mimeType: typeof item.metadata?.mimetype === 'string' ? item.metadata.mimetype : null,
-                updatedAt: item.updated_at || null,
-                createdAt: item.created_at || null,
-            };
+                mime_type: file.type,
+                size: file.size,
+                bytes: new Uint8Array(await file.arrayBuffer()),
+            },
         });
-
-    return { success: true, data: assets };
+        return { success: true, url: `/api/media/${record.id}` };
+    } catch (error) {
+        console.error('Image upload failed', error);
+        return { success: false, error: 'Image upload failed' };
+    }
 }
 
-export async function deleteMediaAsset(path: string): Promise<{ success: boolean; error?: string }> {
-    const supabase = await createSupabaseClient();
+export async function listMediaAssets(folder = 'images'): Promise<MediaActionResult> {
+    if (!await isAuthorized()) return unauthorizedResult();
+    if (!ALLOWED_UPLOAD_FOLDERS.has(folder)) return { success: false, error: 'Media folder is not allowed' };
+
     try {
-        await requireAdminUser(supabase);
-    } catch {
-        return unauthorizedResult();
+        const records = await getPrisma().mediaAsset.findMany({
+            where: { folder },
+            orderBy: { updated_at: 'desc' },
+            take: 200,
+            omit: { bytes: true },
+        });
+        const data: MediaAsset[] = records.map((record) => ({
+            name: record.name,
+            path: record.path,
+            url: `/api/media/${record.id}`,
+            folder: record.folder,
+            size: record.size,
+            mimeType: record.mime_type,
+            updatedAt: record.updated_at.toISOString(),
+            createdAt: record.created_at.toISOString(),
+        }));
+        return { success: true, data };
+    } catch (error) {
+        console.error('Unable to list media assets', error);
+        return { success: false, error: 'Unable to list media assets' };
     }
+}
+
+export async function deleteMediaAsset(path: string): Promise<MediaActionResult> {
+    if (!await isAuthorized()) return unauthorizedResult();
 
     const normalizedPath = normalizeStoragePath(path);
+    if (!isAllowedStoragePath(normalizedPath)) return { success: false, error: 'Media path is not allowed' };
 
-    if (!isAllowedStoragePath(normalizedPath)) {
-        return { success: false, error: 'Media path is not allowed' };
+    try {
+        await getPrisma().mediaAsset.delete({ where: { path: normalizedPath } });
+        return { success: true };
+    } catch {
+        return { success: false, error: 'Media asset was not found' };
     }
-
-    const { error } = await supabase.storage
-        .from(BUCKET)
-        .remove([normalizedPath]);
-
-    if (error) {
-        return { success: false, error: error.message };
-    }
-
-    return { success: true };
 }
 
-export async function deleteImage(url: string): Promise<{ success: boolean; error?: string }> {
-    const supabase = await createSupabaseClient();
+export async function deleteImage(url: string): Promise<MediaActionResult> {
+    if (!await isAuthorized()) return unauthorizedResult();
+
+    const id = url.match(/\/api\/media\/([0-9a-f-]{36})(?:$|[?#])/i)?.[1];
+    if (!id) return { success: false, error: 'Invalid media URL' };
+
     try {
-        await requireAdminUser(supabase);
+        await getPrisma().mediaAsset.delete({ where: { id } });
+        return { success: true };
     } catch {
-        return unauthorizedResult();
+        return { success: false, error: 'Media asset was not found' };
     }
-
-    // Extract path from URL
-    const match = url.match(new RegExp(`/storage/v1/object/public/${BUCKET}/(.+)$`));
-    if (!match) {
-        return { success: false, error: 'Invalid URL' };
-    }
-
-    const path = normalizeStoragePath(match[1]);
-
-    if (!isAllowedStoragePath(path)) {
-        return { success: false, error: 'Media path is not allowed' };
-    }
-
-    const { error } = await supabase.storage
-        .from(BUCKET)
-        .remove([path]);
-
-    if (error) {
-        return { success: false, error: error.message };
-    }
-
-    return { success: true };
 }

@@ -10,8 +10,8 @@ export const fallbackSettings = {
     site_title: 'DURRAT Construction',
     hero_headline: 'Excellence in Oil & Gas Construction',
     hero_subheadline: 'Building world-class energy infrastructure with precision engineering, proven expertise, and unwavering commitment to safety and quality.',
-    contact_email: 'info@durrat.com',
-    contact_phone: '+966 123 456 789',
+    contact_email: 'info@dtgsa.com',
+    contact_phone: '+966500109053',
     contact_address: 'Riyadh, Saudi Arabia',
 };
 

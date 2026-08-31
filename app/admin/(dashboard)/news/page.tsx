@@ -7,7 +7,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { getNews, createNews, updateNews, deleteNews } from '@/lib/actions';
 import ImageUpload from '@/components/admin/ImageUpload';
 import { normalizeAssetUrl } from '@/lib/asset-url';
-import type { News } from '@/lib/supabase/types';
+import type { News } from '@/lib/types/content';
 import { toast } from 'sonner';
 import AdminDataTable from '@/components/admin/AdminDataTable';
 

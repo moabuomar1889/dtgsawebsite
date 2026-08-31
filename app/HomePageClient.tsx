@@ -1,31 +1,30 @@
 "use client";
 
 import { useState } from 'react';
-import LeftSidebar from '@/components/layout/LeftSidebar';
 import TopNav from '@/components/layout/TopNav';
 import FullpageWrapper from '@/components/layout/FullpageWrapper';
 import Hero from '@/components/sections/Hero';
 import About from '@/components/sections/About';
 import Experience from '@/components/sections/Experience';
 import Services from '@/components/sections/Services';
-import Projects from '@/components/sections/Projects';
 import Clients from '@/components/sections/Clients';
-import News from '@/components/sections/News';
-import Contact from '@/components/sections/Contact';
+import Contact, { type ContactDetails } from '@/components/sections/Contact';
 
-const sections = [
-    { id: 'home', name: 'Home', component: <Hero /> },
-    { id: 'about', name: 'About', component: <About /> },
-    { id: 'experience', name: 'Experience', component: <Experience /> },
-    { id: 'services', name: 'Services', component: <Services /> },
-    { id: 'projects', name: 'Projects', component: <Projects /> },
-    { id: 'clients', name: 'Clients', component: <Clients /> },
-    { id: 'news', name: 'News', component: <News /> },
-    { id: 'contact', name: 'Contact', component: <Contact /> },
-];
+interface HomePageClientProps {
+    contactDetails: ContactDetails;
+    heroImageUrl: string;
+}
 
-export default function HomePageClient() {
+export default function HomePageClient({ contactDetails, heroImageUrl }: HomePageClientProps) {
     const [activeSection, setActiveSection] = useState('home');
+    const sections = [
+        { id: 'home', name: 'Home', component: <Hero heroImageUrl={heroImageUrl} /> },
+        { id: 'about', name: 'About', component: <About /> },
+        { id: 'experience', name: 'Experience', component: <Experience /> },
+        { id: 'services', name: 'Services', component: <Services /> },
+        { id: 'clients', name: 'Clients', component: <Clients /> },
+        { id: 'contact', name: 'Contact', component: <Contact contactDetails={contactDetails} /> },
+    ];
 
     const handleSectionChange = (sectionId: string) => {
         setActiveSection(sectionId);
@@ -34,8 +33,10 @@ export default function HomePageClient() {
     return (
         <div className="relative bg-bg">
             {/* Fixed UI Elements */}
-            <LeftSidebar />
-            <TopNav activeSection={activeSection} />
+            <TopNav
+                activeSection={activeSection}
+                phone={contactDetails.phone}
+            />
 
             {/* Fullpage Sections */}
             <FullpageWrapper

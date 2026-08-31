@@ -59,7 +59,8 @@ export default function AdminMediaPage() {
     };
 
     useEffect(() => {
-        void loadAssets(selectedFolder);
+        const timer = window.setTimeout(() => void loadAssets(selectedFolder), 0);
+        return () => window.clearTimeout(timer);
     }, [selectedFolder]);
 
     const copyUrl = async (url: string) => {

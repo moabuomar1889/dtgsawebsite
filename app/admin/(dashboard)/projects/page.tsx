@@ -5,7 +5,7 @@ import { getProjects, getClients, createProject, updateProject, deleteProject } 
 import ImageUpload from '@/components/admin/ImageUpload';
 import PhotoEditor from '@/components/admin/PhotoEditor';
 import AdminDataTable from '@/components/admin/AdminDataTable';
-import type { Project, Client } from '@/lib/supabase/types';
+import type { Project, Client } from '@/lib/types/content';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Plus, Trash2, GripVertical, Pencil, X, ChevronLeft, ChevronRight, Search, Star, Images, ImageOff, RotateCcw, Save, UploadCloud } from 'lucide-react';
 import Image from 'next/image';

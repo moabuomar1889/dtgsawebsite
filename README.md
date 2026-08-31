@@ -1,134 +1,75 @@
-# DURRAT Construction Website
+# DTGSA Website
 
-A Gilber-style fullpage scroll website with Supabase CMS backend.
+The Durrat Construction company website and its administration panel. The approved public design remains a Next.js full-page experience; content, administrator sessions, contact messages, and uploaded media are persisted in PostgreSQL.
 
-## Tech Stack
+## Deployment Contract
 
-- **Frontend**: Next.js 16 (App Router), TypeScript, Tailwind CSS v4, Framer Motion
-- **Backend**: Supabase (Auth, Database, Storage)
-- **Database**: use `public` for the self-hosted private Supabase database. The legacy cloud schema name is supported only when `NEXT_PUBLIC_SUPABASE_DB_SCHEMA` is set.
+| Setting | Value |
+| --- | --- |
+| Framework | Next.js 16.3.3, App Router |
+| Runtime | Node.js 24.x |
+| Package manager | npm 11, using `package-lock.json` |
+| Install command | `npm ci` |
+| Build command | `npm run build` |
+| Start command | `npm run start` |
+| Health check | `GET /api/health` |
+| Production branch | `main` |
+| Staging branch | `staging` |
 
-## Setup
+The start command applies committed Prisma migrations, seeds missing baseline public content, and starts Next.js on `0.0.0.0`. Next.js reads the platform-provided `PORT` environment variable automatically; it defaults to port 3000 when `PORT` is absent.
 
-### 1. Clone and Install
+Use the platform's native Node.js or Nixpacks build method. This application does not require a Dockerfile or Docker Compose.
+
+## Environment
+
+Required at runtime:
+
+```text
+DATABASE_URL
+```
+
+`DATABASE_URL` must be a PostgreSQL connection string supplied as a runtime secret by the deployment platform. Do not commit it or any local `.env` file.
+
+One-time administrator bootstrap variables:
+
+```text
+ADMIN_EMAIL
+ADMIN_PASSWORD
+```
+
+After the database is reachable and migrations have run, create or reset the administrator with:
 
 ```bash
-cd dtgsa-website
-npm install
+npm run admin:create
 ```
 
-### 2. Create Supabase Project
+Supply `ADMIN_EMAIL` and `ADMIN_PASSWORD` only for that one-time command. They are not required by the running application and should be removed from the command environment afterward.
 
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. Wait for the project to be ready (~2 minutes)
+## Local Verification
 
-### 3. Configure Environment
-
-Create `.env.local` file:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-NEXT_PUBLIC_SITE_URL=https://www.example.com
-ADMIN_EMAILS=admin@example.com
-```
-
-Find these values in Supabase Dashboard → Settings → API.
-
-`NEXT_PUBLIC_SITE_URL` is used for password reset links. `ADMIN_EMAILS` is a server-only comma-separated allowlist for admin access.
-
-### 4. Run Database Schema
-
-Copy the contents of `supabase/schema.sql` and run it in Supabase SQL Editor:
-
-1. Go to Supabase Dashboard → SQL Editor
-2. Paste the entire schema.sql content
-3. Click "Run"
-
-This creates:
-- All tables with proper structure
-- Row Level Security (RLS) policies
-- Seed data for initial content
-
-### 5. Create Storage Bucket
-
-1. Go to Supabase Dashboard → Storage
-2. Create a new bucket called `dtgsa-website-assets`
-3. Make it public (for reading)
-
-### 6. Create Admin User
-
-1. Go to Supabase Dashboard → Authentication → Users
-2. Click "Add User"
-3. Enter email and password
-4. Set `app_metadata.role` to `admin`, or add the email to `ADMIN_EMAILS`
-5. This user can now log into `/admin/login`
-
-### 7. Run Development Server
+Set `DATABASE_URL` to a test PostgreSQL database, then run:
 
 ```bash
-npm run dev
+npm ci
+npm run build
+npm run start
 ```
 
-Visit:
-- **Public site**: http://localhost:3000
-- **Admin login**: http://localhost:3000/admin/login
+The public site is available on the port selected by `PORT`. The administration login is `/admin/login`, and the health response is `/api/health`.
 
-## Admin CMS
+Useful checks:
 
-| Route | Description |
-|-------|-------------|
-| `/admin` | Dashboard with stats |
-| `/admin/settings` | Site settings, accent color |
-| `/admin/clients` | Manage clients |
-| `/admin/projects` | Manage projects |
-| `/admin/news` | Manage news articles |
-| `/admin/experience` | Manage experience entries |
-| `/admin/services` | Manage services |
-| `/admin/messages` | Read contact messages |
+```bash
+npm run lint
+npm run test:security
+```
 
-## Security
+## Data Lifecycle
 
-- **RLS Enabled**: All tables have Row Level Security
-- **Public Read**: Published content readable by anyone
-- **Admin Write**: Only admin users can modify CMS data
-- **Storage Protection**: Public image reads are allowed, but upload/update/delete require admin
-- **No Service Role**: CMS uses user session for all operations
+- Prisma migrations in `prisma/migrations` own the PostgreSQL schema.
+- `prisma/seed.ts` adds approved baseline content only when a section is empty.
+- Uploaded media is stored in PostgreSQL and served through `/api/media/:id`.
+- The application does not write persistent content or cache data to the container filesystem.
+- Static assets under `public/` are immutable build inputs, not runtime persistence.
 
-## Database Schema
-
-Self-hosted deployments should keep website tables in `public`:
-
-- `settings` - Site settings (single row)
-- `clients` - Client logos and info
-- `projects` - Project portfolio
-- `news` - News articles
-- `experience` - Work experience
-- `services` - Services offered
-- `contact_messages` - Form submissions
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push to GitHub
-2. Import project in Vercel
-3. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_SITE_URL`
-   - `ADMIN_EMAILS`
-4. Deploy
-
-### Supabase Auth Email
-
-Password reset emails are sent by Supabase Auth, not by the Next.js app. Configure SMTP in Supabase Auth:
-
-- `SITE_URL` should be the canonical public site URL.
-- Additional redirect URLs must include `/admin/reset-password`.
-- SMTP host, port, user, password, sender email, and sender name must point to a real email provider.
-- SPF, DKIM, and DMARC should be configured for the sender domain.
-
-## Fallback Data
-
-When the database is empty or not configured, the site displays seeded placeholder data. This ensures the site always looks complete.
+The production domain is intentionally not configured in this repository. Infrastructure will connect `dtgsa.com` after staging acceptance.

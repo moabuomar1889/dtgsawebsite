@@ -2,23 +2,13 @@
 
 import { motion } from 'framer-motion';
 import { heroStagger, heroItem } from '@/lib/motion';
-import { useEffect, useState } from 'react';
-import { getSettings } from '@/lib/actions';
 import Image from 'next/image';
 
-export default function Hero() {
-    const [heroImageUrl, setHeroImageUrl] = useState('/placeholders/hero-bg.jpg');
+interface HeroProps {
+    heroImageUrl: string;
+}
 
-    useEffect(() => {
-        const loadSettings = async () => {
-            const settings = await getSettings();
-            if (settings?.hero_image_url) {
-                setHeroImageUrl(settings.hero_image_url);
-            }
-        };
-        loadSettings();
-    }, []);
-
+export default function Hero({ heroImageUrl }: HeroProps) {
     return (
         <section id="home" className="relative h-screen flex items-center justify-center overflow-hidden">
             {/* Background Image */}
@@ -69,10 +59,10 @@ export default function Hero() {
 
                 <motion.div variants={heroItem} className="flex gap-4 justify-center flex-wrap">
                     <a
-                        href="#projects"
+                        href="#services"
                         className="px-8 py-4 bg-accent text-white rounded-lg font-medium hover:opacity-90 transition-opacity duration-200"
                     >
-                        View Projects
+                        Our Services
                     </a>
                     <a
                         href="#contact"

@@ -7,9 +7,10 @@ import MobileMenu from './MobileMenu';
 
 interface TopNavProps {
     activeSection?: string;
+    phone: string;
 }
 
-export default function TopNav({ activeSection = 'home' }: TopNavProps) {
+export default function TopNav({ activeSection = 'home', phone }: TopNavProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -74,7 +75,7 @@ export default function TopNav({ activeSection = 'home' }: TopNavProps) {
 
                     {/* Phone Number - like Gilber */}
                     <div className="text-[13px] font-medium text-white tracking-wide">
-                        +966 13 867 0967
+                        {phone}
                     </div>
                 </div>
             </motion.nav>

@@ -1,65 +1,19 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { isAdminUser } from '@/lib/auth/admin';
+import { ADMIN_SESSION_COOKIE } from '@/lib/auth/constants';
 
-export async function proxy(request: NextRequest) {
-    let supabaseResponse = NextResponse.next({
-        request,
-    });
-
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll();
-                },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value }) =>
-                        request.cookies.set(name, value)
-                    );
-                    supabaseResponse = NextResponse.next({
-                        request,
-                    });
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    );
-                },
-            },
-        }
-    );
-
-    // Refresh session if expired
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    // Protect admin routes (except public auth pages)
-    const isAdminRoute = request.nextUrl.pathname.startsWith('/admin');
+export function proxy(request: NextRequest) {
     const isLoginPage = request.nextUrl.pathname === '/admin/login';
-    const isResetPasswordPage = request.nextUrl.pathname === '/admin/reset-password';
-    const isPublicAdminAuthPage = isLoginPage || isResetPasswordPage;
+    const hasSessionCookie = Boolean(request.cookies.get(ADMIN_SESSION_COOKIE)?.value);
 
-    if (isAdminRoute && !isPublicAdminAuthPage && !isAdminUser(user)) {
-        // Redirect to login if not authenticated
+    if (!isLoginPage && !hasSessionCookie) {
         const url = request.nextUrl.clone();
         url.pathname = '/admin/login';
         return NextResponse.redirect(url);
     }
 
-    if (isLoginPage && isAdminUser(user)) {
-        // Redirect to admin dashboard if already logged in
-        const url = request.nextUrl.clone();
-        url.pathname = '/admin';
-        return NextResponse.redirect(url);
-    }
-
-    return supabaseResponse;
+    return NextResponse.next();
 }
 
 export const config = {
-    matcher: [
-        '/admin/:path*',
-    ],
+    matcher: ['/admin/:path*'],
 };

@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Settings {
+  id               String   @id @default(uuid()) @db.Uuid
+  accent_color     String   @default("#ffbb00") @db.VarChar(20)
+  background_color String   @default("#161616") @db.VarChar(20)
+  text_color       String   @default("#d7d7d7") @db.VarChar(20)
+  hero_image_url   String?
+  about_image_url  String?
+  contact_bg_url   String?
+  site_title       String   @default("DURRAT Construction") @db.VarChar(255)
+  hero_headline    String   @default("Excellence in Oil & Gas Construction")
+  hero_subheadline String   @default("Building world-class energy infrastructure with precision engineering, proven expertise, and unwavering commitment to safety and quality.")
+  contact_email    String   @default("info@dtgsa.com") @db.VarChar(255)
+  contact_phone    String   @default("+966500109053") @db.VarChar(50)
+  contact_address  String   @default("Riyadh, Saudi Arabia")
+  updated_at       DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("settings")
+}
+
+model Client {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(255)
+  website_url String?
+  logo_url_bw String?
+  sort_order  Int       @default(0)
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  projects    Project[]
+
+  @@map("clients")
+}
+
+model Project {
+  id           String   @id @default(uuid()) @db.Uuid
+  title        String   @db.VarChar(255)
+  description  String?
+  year         String?  @db.VarChar(10)
+  site         String?
+  duration     String?  @db.VarChar(100)
+  image_url    String?
+  gallery_urls String[] @default([])
+  client_id    String?  @db.Uuid
+  is_featured  Boolean  @default(false)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  client       Client?  @relation(fields: [client_id], references: [id], onDelete: SetNull)
+
+  @@index([client_id])
+  @@map("projects")
+}
+
+model News {
+  id           String   @id @default(uuid()) @db.Uuid
+  title        String   @db.VarChar(255)
+  date         DateTime @default(now()) @db.Date
+  excerpt      String   @default("")
+  image_url    String?
+  is_published Boolean  @default(false)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("news")
+}
+
+model Experience {
+  id          String @id @default(uuid()) @db.Uuid
+  title       String @db.VarChar(255)
+  company     String @default("") @db.VarChar(255)
+  start_year  Int
+  end_year    Int?
+  description String @default("")
+  sort_order  Int    @default(0)
+
+  @@map("experience")
+}
+
+model Service {
+  id          String  @id @default(uuid()) @db.Uuid
+  title       String  @db.VarChar(255)
+  description String  @default("")
+  icon_key    String  @default("wrench") @db.VarChar(50)
+  icon_url    String?
+  sort_order  Int     @default(0)
+
+  @@map("services")
+}
+
+model ContactMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @db.VarChar(255)
+  email      String   @db.VarChar(255)
+  message    String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("contact_messages")
+}
+
+model MediaAsset {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  path       String   @unique
+  folder     String
+  mime_type  String
+  size       Int
+  bytes      Bytes
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@index([folder, updated_at])
+  @@map("media_assets")
+}
+
+model AdminUser {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String         @unique
+  password_hash String
+  role          String         @default("admin")
+  is_active     Boolean        @default(true)
+  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+  sessions      AdminSession[]
+
+  @@map("admin_users")
+}
+
+model AdminSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  token_hash String    @unique
+  user_id    String    @db.Uuid
+  expires_at DateTime  @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  user       AdminUser @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("admin_sessions")
+}

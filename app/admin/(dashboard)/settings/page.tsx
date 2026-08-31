@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '@/lib/actions';
+import { changeAdminPassword } from '@/lib/auth/actions';
 import ImageUpload from '@/components/admin/ImageUpload';
 import { DEFAULT_ACCENT_COLOR, normalizeHexColor } from '@/lib/theme-colors';
-import { createClient } from '@/lib/supabase/client';
 import { Eye, EyeOff } from 'lucide-react';
 
-const MIN_PASSWORD_LENGTH = 8;
+const MIN_PASSWORD_LENGTH = 12;
 
 function PasswordInput({
     id,
@@ -54,7 +54,6 @@ export default function AdminSettingsPage() {
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [passwordSaving, setPasswordSaving] = useState(false);
     const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const supabase = useMemo(() => createClient(), []);
 
     // Form state
     const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR);
@@ -143,32 +142,10 @@ export default function AdminSettingsPage() {
         setPasswordSaving(true);
 
         try {
-            const {
-                data: { user },
-                error: userError,
-            } = await supabase.auth.getUser();
+            const result = await changeAdminPassword({ currentPassword, newPassword });
 
-            if (userError || !user?.email) {
-                setPasswordMessage({ type: 'error', text: 'Could not verify the current admin session' });
-                return;
-            }
-
-            const { error: signInError } = await supabase.auth.signInWithPassword({
-                email: user.email,
-                password: currentPassword,
-            });
-
-            if (signInError) {
-                setPasswordMessage({ type: 'error', text: 'Current password is incorrect' });
-                return;
-            }
-
-            const { error: updateError } = await supabase.auth.updateUser({
-                password: newPassword,
-            });
-
-            if (updateError) {
-                setPasswordMessage({ type: 'error', text: updateError.message });
+            if (!result.success) {
+                setPasswordMessage({ type: 'error', text: result.error ?? 'Unable to update password' });
                 return;
             }
 
