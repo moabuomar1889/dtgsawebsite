@@ -4,10 +4,19 @@ import "filepond/dist/filepond.min.css";
 import { ThemeProvider } from "@/lib/theme";
 import SmoothScrollProvider from "@/components/providers/SmoothScrollProvider";
 import { Toaster } from "sonner";
+import { getSiteUrl } from "@/lib/site-url";
+
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
   title: "Durrat Construction - Oil & Gas Construction Specialists",
   description: "Leading oil & gas construction contractor specializing in offshore platforms, pipelines, processing facilities, and EPC projects.",
+  ...(siteUrl
+    ? {
+        metadataBase: siteUrl,
+        alternates: { canonical: "/" },
+      }
+    : {}),
 };
 
 export default function RootLayout({

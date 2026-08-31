@@ -28,7 +28,15 @@ Required at runtime:
 DATABASE_URL
 ```
 
-`DATABASE_URL` must be a PostgreSQL connection string supplied as a runtime secret by the deployment platform. Do not commit it or any local `.env` file.
+`DATABASE_URL` must be a PostgreSQL connection string supplied as a runtime secret by the deployment platform. It is not needed by the clean build command; the start command requires it for migrations, seeding, and application data. Do not commit it or any local `.env` file.
+
+Public URL configuration:
+
+```text
+SITE_URL
+```
+
+Set `SITE_URL` to the public origin assigned to each deployment, without a trailing path. For staging, use the assigned `https://*.dtgapps.cc` origin. After staging acceptance and infrastructure routing, set production to `https://dtgsa.com`. The application uses this value for canonical metadata and never hardcodes the temporary staging hostname. `SITE_URL` is not required for a clean build, but canonical metadata is omitted until it is configured.
 
 One-time administrator bootstrap variables:
 
@@ -72,4 +80,4 @@ npm run test:security
 - The application does not write persistent content or cache data to the container filesystem.
 - Static assets under `public/` are immutable build inputs, not runtime persistence.
 
-The production domain is intentionally not configured in this repository. Infrastructure will connect `dtgsa.com` after staging acceptance.
+The production domain is intentionally not activated in this repository. Infrastructure will connect `dtgsa.com` after staging acceptance; the application code already supports it through `SITE_URL`.
