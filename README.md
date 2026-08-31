@@ -16,7 +16,7 @@ The Durrat Construction company website and its administration panel. The approv
 | Production branch | `main` |
 | Staging branch | `staging` |
 
-The start command applies committed Prisma migrations, seeds missing baseline public content, and starts Next.js on `0.0.0.0`. Next.js reads the platform-provided `PORT` environment variable automatically; it defaults to port 3000 when `PORT` is absent.
+The start command applies committed Prisma migrations and starts Next.js on `0.0.0.0`. It never seeds content during container startup. Next.js reads the platform-provided `PORT` environment variable automatically; it defaults to port 3000 when `PORT` is absent.
 
 Use the platform's native Node.js or Nixpacks build method. This application does not require a Dockerfile or Docker Compose.
 
@@ -26,9 +26,18 @@ Required at runtime:
 
 ```text
 DATABASE_URL
+MIGRATION_DATABASE_URL
 ```
 
-`DATABASE_URL` must be a PostgreSQL connection string supplied as a runtime secret by the deployment platform. It is not needed by the clean build command; the start command requires it for migrations, seeding, and application data. Do not commit it or any local `.env` file.
+`DATABASE_URL` is the least-privilege connection used only by the running Next.js application. `MIGRATION_DATABASE_URL` is the schema-owning connection used by Prisma CLI migrations and guarded bootstrap operations. Prisma CLI prefers `MIGRATION_DATABASE_URL` and falls back to `DATABASE_URL` only for local compatibility. Neither variable is needed by the clean build command. Do not commit either value or any local `.env` file, and do not grant schema creation to the runtime role.
+
+Optional baseline content bootstrap is a separate operator action. It is serialized with a PostgreSQL advisory transaction lock and skips sections that already contain data. Run it only after migrations, with a temporary opt-in:
+
+```bash
+DTG_DATABASE_BOOTSTRAP_ENABLED=true npm run db:bootstrap
+```
+
+The bootstrap command requires `MIGRATION_DATABASE_URL`; it never uses `DATABASE_URL`. Remove `DTG_DATABASE_BOOTSTRAP_ENABLED` from the command environment afterward.
 
 Public URL configuration:
 
@@ -55,7 +64,7 @@ Supply `ADMIN_EMAIL` and `ADMIN_PASSWORD` only for that one-time command. They a
 
 ## Local Verification
 
-Set `DATABASE_URL` to a test PostgreSQL database, then run:
+Set `DATABASE_URL` and `MIGRATION_DATABASE_URL` to the appropriate test PostgreSQL roles, then run:
 
 ```bash
 npm ci
@@ -69,13 +78,15 @@ Useful checks:
 
 ```bash
 npm run lint
-npm run test:security
+npm run typecheck
+npm test
+npx prisma validate
 ```
 
 ## Data Lifecycle
 
 - Prisma migrations in `prisma/migrations` own the PostgreSQL schema.
-- `prisma/seed.ts` adds approved baseline content only when a section is empty.
+- `prisma/seed.ts` is an explicit, guarded bootstrap that adds approved baseline content only when a section is empty.
 - Uploaded media is stored in PostgreSQL and served through `/api/media/:id`.
 - The application does not write persistent content or cache data to the container filesystem.
 - Static assets under `public/` are immutable build inputs, not runtime persistence.

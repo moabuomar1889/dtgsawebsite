@@ -1,11 +1,15 @@
 import 'dotenv/config';
-import { getPrisma } from '../lib/db';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient, type Prisma } from '../generated/prisma/client';
+import { requireBootstrapDatabaseUrl } from '../lib/database-urls';
 import {
     fallbackExperience,
     fallbackNews,
     fallbackProjects,
     fallbackServices,
 } from '../lib/fallback-data';
+
+const BOOTSTRAP_LOCK_ID = BigInt('44554477100109053');
 
 const clients = [
     ['Saudi Aramco', '1769854198338-qq4frq.png'],
@@ -20,10 +24,10 @@ const clients = [
     ['BHIG', '1769889396288-ukj42r.png'],
 ] as const;
 
-async function seedSettings() {
-    if (await getPrisma().settings.count() > 0) return;
+async function seedSettings(database: Prisma.TransactionClient) {
+    if (await database.settings.count() > 0) return;
 
-    await getPrisma().settings.create({
+    await database.settings.create({
         data: {
             hero_image_url: '/local-storage/settings/1769422373553-3rg0w9.jpg',
             site_title: 'DURRAT Construction',
@@ -36,10 +40,10 @@ async function seedSettings() {
     });
 }
 
-async function seedClients() {
-    if (await getPrisma().client.count() > 0) return;
+async function seedClients(database: Prisma.TransactionClient) {
+    if (await database.client.count() > 0) return;
 
-    await getPrisma().client.createMany({
+    await database.client.createMany({
         data: clients.map(([name, filename], sort_order) => ({
             name,
             logo_url_bw: `/local-storage/clients/${filename}`,
@@ -48,9 +52,9 @@ async function seedClients() {
     });
 }
 
-async function seedPublicSections() {
-    if (await getPrisma().experience.count() === 0) {
-        await getPrisma().experience.createMany({
+async function seedPublicSections(database: Prisma.TransactionClient) {
+    if (await database.experience.count() === 0) {
+        await database.experience.createMany({
             data: fallbackExperience.map(({ id, ...record }) => {
                 void id;
                 return record;
@@ -58,8 +62,8 @@ async function seedPublicSections() {
         });
     }
 
-    if (await getPrisma().service.count() === 0) {
-        await getPrisma().service.createMany({
+    if (await database.service.count() === 0) {
+        await database.service.createMany({
             data: fallbackServices.map(({ id, ...record }) => {
                 void id;
                 return record;
@@ -67,8 +71,8 @@ async function seedPublicSections() {
         });
     }
 
-    if (await getPrisma().project.count() === 0) {
-        await getPrisma().project.createMany({
+    if (await database.project.count() === 0) {
+        await database.project.createMany({
             data: fallbackProjects.map(({ id, ...record }) => {
                 void id;
                 return { ...record, gallery_urls: [] };
@@ -76,8 +80,8 @@ async function seedPublicSections() {
         });
     }
 
-    if (await getPrisma().news.count() === 0) {
-        await getPrisma().news.createMany({
+    if (await database.news.count() === 0) {
+        await database.news.createMany({
             data: fallbackNews.map(({ id, date, ...record }) => {
                 void id;
                 return { ...record, date: new Date(`${date}T00:00:00.000Z`) };
@@ -87,15 +91,26 @@ async function seedPublicSections() {
 }
 
 async function main() {
-    await seedSettings();
-    await seedClients();
-    await seedPublicSections();
-    console.log('Public website seed data is ready.');
+    const connectionString = requireBootstrapDatabaseUrl();
+    const prisma = new PrismaClient({
+        adapter: new PrismaPg({ connectionString }),
+    });
+
+    try {
+        await prisma.$transaction(async (database) => {
+            await database.$queryRaw`SELECT pg_advisory_xact_lock(${BOOTSTRAP_LOCK_ID})`;
+            await seedSettings(database);
+            await seedClients(database);
+            await seedPublicSections(database);
+        });
+        console.log('Public website bootstrap data is ready.');
+    } finally {
+        await prisma.$disconnect();
+    }
 }
 
 main()
     .catch((error) => {
         console.error(error);
         process.exitCode = 1;
-    })
-    .finally(async () => getPrisma().$disconnect());
+    });
