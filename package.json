@@ -12,12 +12,13 @@
     "start": "prisma migrate deploy && next start -H 0.0.0.0",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:security && npm run test:deployment",
+    "test": "npm run test:security && npm run test:deployment && npm run test:assets",
     "db:deploy": "prisma migrate deploy",
     "db:bootstrap": "prisma db seed",
     "admin:create": "tsx scripts/create-admin.ts",
     "test:security": "tsx scripts/security-smoke-test.mjs",
-    "test:deployment": "tsx scripts/deployment-contract-test.mjs"
+    "test:deployment": "tsx scripts/deployment-contract-test.mjs",
+    "test:assets": "tsx scripts/public-assets-test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

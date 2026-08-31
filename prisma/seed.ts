@@ -3,40 +3,21 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, type Prisma } from '../generated/prisma/client';
 import { requireBootstrapDatabaseUrl } from '../lib/database-urls';
 import {
+    fallbackClients,
     fallbackExperience,
     fallbackNews,
     fallbackProjects,
     fallbackServices,
+    fallbackSettings,
 } from '../lib/fallback-data';
 
 const BOOTSTRAP_LOCK_ID = BigInt('44554477100109053');
-
-const clients = [
-    ['Saudi Aramco', '1769854198338-qq4frq.png'],
-    ['Air Products', '1769854258788-2c3c48.png'],
-    ['National Information Center', '1769888434350-a2bhsf.png'],
-    ['JIGPC', '1769860372767-91u5xf.png'],
-    ['KENT', '1769857611614-8f1fp.jpg'],
-    ['LARSEN & TOUBRO', '1769857954956-d1y75q.jpg'],
-    ['SNC LAVALIN', '1769888550146-q14by.png'],
-    ['Thales', '1769888541215-q81f9h.png'],
-    ['MAADEN', '1769889085565-tnvh4c.png'],
-    ['BHIG', '1769889396288-ukj42r.png'],
-] as const;
 
 async function seedSettings(database: Prisma.TransactionClient) {
     if (await database.settings.count() > 0) return;
 
     await database.settings.create({
-        data: {
-            hero_image_url: '/local-storage/settings/1769422373553-3rg0w9.jpg',
-            site_title: 'DURRAT Construction',
-            hero_headline: ' Oil & Gas Construction',
-            hero_subheadline: 'Building world-class energy infrastructure with precision engineering, proven expertise, and unwavering commitment to safety and quality.',
-            contact_email: 'info@dtgsa.com',
-            contact_phone: '+966500109053',
-            contact_address: 'Riyadh, Saudi Arabia',
-        },
+        data: fallbackSettings,
     });
 }
 
@@ -44,11 +25,10 @@ async function seedClients(database: Prisma.TransactionClient) {
     if (await database.client.count() > 0) return;
 
     await database.client.createMany({
-        data: clients.map(([name, filename], sort_order) => ({
-            name,
-            logo_url_bw: `/local-storage/clients/${filename}`,
-            sort_order,
-        })),
+        data: fallbackClients.map(({ id, ...client }) => {
+            void id;
+            return client;
+        }),
     });
 }
 
