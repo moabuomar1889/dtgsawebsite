@@ -5,7 +5,7 @@ export const fallbackSettings = {
     accent_color: '#ffbb00',
     background_color: '#161616',
     text_color: '#d7d7d7',
-    hero_image_url: '/placeholders/hero-bg.jpg',
+    hero_image_url: '/local-storage/settings/1769422373553-3rg0w9.jpg',
     contact_bg_url: null,
     site_title: 'DURRAT Construction',
     hero_headline: 'Excellence in Oil & Gas Construction',
@@ -16,12 +16,16 @@ export const fallbackSettings = {
 };
 
 export const fallbackClients = [
-    { id: '1', name: 'Saudi Aramco', logo_url_bw: null, website_url: null, sort_order: 1, is_active: true },
-    { id: '2', name: 'SABIC', logo_url_bw: null, website_url: null, sort_order: 2, is_active: true },
-    { id: '3', name: 'Saudi Electricity Company', logo_url_bw: null, website_url: null, sort_order: 3, is_active: true },
-    { id: '4', name: 'ACWA Power', logo_url_bw: null, website_url: null, sort_order: 4, is_active: true },
-    { id: '5', name: 'Maaden', logo_url_bw: null, website_url: null, sort_order: 5, is_active: true },
-    { id: '6', name: 'Petro Rabigh', logo_url_bw: null, website_url: null, sort_order: 6, is_active: true },
+    { id: '1', name: 'Saudi Aramco', logo_url_bw: '/local-storage/clients/1769854198338-qq4frq.png', website_url: null, sort_order: 1, is_active: true },
+    { id: '2', name: 'Air Products', logo_url_bw: '/local-storage/clients/1769854258788-2c3c48.png', website_url: null, sort_order: 2, is_active: true },
+    { id: '3', name: 'National Information Center', logo_url_bw: '/local-storage/clients/1769888434350-a2bhsf.png', website_url: null, sort_order: 3, is_active: true },
+    { id: '4', name: 'JIGPC', logo_url_bw: '/local-storage/clients/1769860372767-91u5xf.png', website_url: null, sort_order: 4, is_active: true },
+    { id: '5', name: 'KENT', logo_url_bw: '/local-storage/clients/1769857611614-8f1fp.jpg', website_url: null, sort_order: 5, is_active: true },
+    { id: '6', name: 'LARSEN & TOUBRO', logo_url_bw: '/local-storage/clients/1769857954956-d1y75q.jpg', website_url: null, sort_order: 6, is_active: true },
+    { id: '7', name: 'SNC LAVALIN', logo_url_bw: '/local-storage/clients/1769888550146-q14by.png', website_url: null, sort_order: 7, is_active: true },
+    { id: '8', name: 'Thales', logo_url_bw: '/local-storage/clients/1769888541215-q81f9h.png', website_url: null, sort_order: 8, is_active: true },
+    { id: '9', name: 'MAADEN', logo_url_bw: '/local-storage/clients/1769889085565-tnvh4c.png', website_url: null, sort_order: 9, is_active: true },
+    { id: '10', name: 'BHIG', logo_url_bw: '/local-storage/clients/1769889396288-ukj42r.png', website_url: null, sort_order: 10, is_active: true },
 ];
 
 export const fallbackProjects = [
